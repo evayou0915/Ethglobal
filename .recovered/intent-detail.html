@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AuraSci — Intent Detail</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="bust-theme.css?v=3" />
+<style>
+.back{display:inline-flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:var(--mute);margin-bottom:32px;transition:color .2s}
+.back:hover{color:var(--rust)}
+
+.detail-grid{display:grid;grid-template-columns:1fr 400px;gap:56px}
+@media (max-width:980px){.detail-grid{grid-template-columns:1fr;gap:32px}}
+
+.ticker-line{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--rust);margin-bottom:10px;display:flex;gap:14px;align-items:center}
+.ticker-line .sep{color:var(--line)}
+.intent-title{font-family:'Newsreader',serif;font-weight:500;font-size:clamp(2rem,4.4vw,3.4rem);line-height:1.1;letter-spacing:-0.02em;color:var(--ink);margin:0 0 24px}
+.intent-title em{font-style:italic;color:var(--rust);font-weight:500}
+
+.scientist-row{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.av-md{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#fed7aa,#fb923c);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#7c2d12}
+.scientist-row .nm{font-family:'Inter',sans-serif;font-weight:600;font-size:16px;color:var(--ink)}
+.scientist-row .af{font-size:13px;color:var(--mute);margin-top:2px}
+
+.tags-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.hyp{font-size:16px;line-height:1.7;color:var(--ink-3);margin-bottom:24px;max-width:680px}
+.ev-links{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.ev-link{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--line);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--ink-3);border-radius:999px;background:#fdfcf8;transition:all .2s}
+.ev-link:hover{border-color:var(--rust);color:var(--rust)}
+
+/* Funding side panel — heavier, hero-style */
+.fund-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:100px;align-self:flex-start}
+.fund-card{position:relative;padding:30px 28px;background:#fdfcf8;border:2px solid var(--ink);border-radius:6px;box-shadow:8px 8px 0 rgba(58,36,24,0.08)}
+.fund-card::before,.fund-card::after{content:'';position:absolute;width:18px;height:18px;border:2px solid var(--rust);pointer-events:none}
+.fund-card::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+.fund-card::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+.fund-stamp{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--rust);letter-spacing:.22em;text-transform:uppercase;font-weight:600;padding:6px 12px;border:1px solid var(--rust);background:rgba(254,215,170,0.30);border-radius:2px;margin-bottom:18px}
+.fund-stamp .dot{width:6px;height:6px;border-radius:50%;background:var(--rust);animation:bl 1.6s ease-in-out infinite}
+.fund-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);margin-bottom:6px;letter-spacing:.08em;text-transform:uppercase}
+.fund-amt{font-family:'Newsreader',serif;font-weight:500;font-size:54px;color:var(--ink);line-height:1;letter-spacing:-0.025em}
+.fund-amt .cur{font-size:22px;color:var(--rust);font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:.04em;margin-right:6px;vertical-align:8px}
+.fund-goal{font-size:13px;color:var(--ink-3);margin-top:10px;line-height:1.5}
+.fund-goal b{color:var(--ink);font-weight:600;font-family:'JetBrains Mono',monospace}
+.fund-pct{font-size:13px;color:var(--ink-3);margin-top:16px;display:flex;justify-content:space-between;align-items:baseline}
+.fund-pct .hl{color:var(--rust);font-weight:700;font-family:'JetBrains Mono',monospace;font-size:15px}
+.fund-input{display:flex;gap:8px;margin-top:18px}
+.fund-input input{flex:1;padding:14px 16px;font-size:15px;font-family:'JetBrains Mono',monospace;border:1px solid var(--line);background:#faf3e3;color:var(--ink);border-radius:4px;box-sizing:border-box;outline:none;transition:all .2s}
+.fund-input input:focus{border-color:var(--rust);background:#fffaee;box-shadow:0 0 0 3px rgba(194,65,12,0.10)}
+.fund-cta{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:12px;padding:16px;background:var(--rust);color:#faf3e3;border:none;border-radius:4px;font-family:'Inter',sans-serif;font-size:15px;font-weight:600;letter-spacing:.04em;cursor:pointer;transition:all .2s}
+.fund-cta:hover{background:var(--ink);transform:translateY(-1px);box-shadow:0 6px 14px rgba(58,36,24,0.18)}
+.fund-cta .arr{font-family:'JetBrains Mono',monospace;font-weight:400}
+.fund-quick{display:flex;gap:6px;margin-top:10px}
+.fund-quick button{flex:1;padding:8px;background:transparent;border:1px solid var(--line);color:var(--ink-3);font-family:'JetBrains Mono',monospace;font-size:12px;border-radius:4px;cursor:pointer;transition:all .2s}
+.fund-quick button:hover{border-color:var(--rust);color:var(--rust);background:rgba(254,215,170,0.18)}
+.fund-trust{margin-top:18px;padding-top:16px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:8px}
+.fund-trust .tr{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-3);line-height:1.4}
+.fund-trust .tr svg{flex-shrink:0;color:#65a30d}
+
+.boost-card{padding:18px;border:1px solid rgba(194,65,12,0.4);background:rgba(254,215,170,0.20);border-radius:6px}
+.boost-card .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust)}
+.boost-card .ttl{font-family:'Newsreader',serif;font-weight:500;font-size:20px;color:var(--ink);margin-top:4px;letter-spacing:-0.01em}
+.boost-card .desc{font-size:13px;color:var(--ink-3);margin-top:6px;line-height:1.5}
+
+.res-card{padding:18px;border:1px solid var(--line);background:#fdfcf8;border-radius:6px}
+.res-card .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);margin-bottom:10px}
+.res-card .item{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--ink-2)}
+.res-card .item .v{color:var(--rust);font-weight:600;font-family:'JetBrains Mono',monospace}
+
+/* Unified milestone trajectory — timeline + detail merged */
+.ms-unified{margin-top:56px;padding-top:32px;border-top:1px solid var(--line)}
+.ms-unified-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:30px;flex-wrap:wrap;gap:12px}
+.ms-unified-head h2{margin:0;font-family:'Newsreader',serif;font-weight:500;font-size:32px;color:var(--ink);letter-spacing:-0.01em}
+.ms-unified-head h2 em{font-style:italic;color:var(--rust)}
+.ms-unified-head .sub{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mute);letter-spacing:.06em}
+
+/* Vertical rail with embedded steps + detail cards */
+.ms-rail{position:relative;padding-left:0}
+.ms-row{position:relative;display:grid;grid-template-columns:64px 1fr;gap:20px;padding-bottom:18px}
+.ms-row:not(:last-child)::before{content:'';position:absolute;left:31px;top:64px;bottom:-4px;width:2px;background:var(--line)}
+.ms-row.done:not(:last-child)::before{background:var(--emerald)}
+.ms-row.active:not(:last-child)::before{background:linear-gradient(to bottom,var(--rust) 0%,var(--rust) 50%,var(--line) 50%,var(--line) 100%)}
+
+.ms-marker{position:relative;z-index:2;width:64px;height:64px;border-radius:50%;background:#fdfcf8;border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--mute)}
+.ms-marker .lbl{font-size:14px;line-height:1}
+.ms-marker .ph{font-size:9px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin-top:3px}
+.ms-row.done .ms-marker{border-color:var(--emerald);color:var(--emerald);background:rgba(101,163,13,0.08)}
+.ms-row.active .ms-marker{border-color:var(--rust);color:var(--rust);background:#fffaee;box-shadow:0 0 0 5px rgba(194,65,12,0.10)}
+
+.ms-card2{padding:22px 24px;border:1px solid var(--line);background:#fdfcf8;border-radius:6px;transition:all .2s;position:relative}
+.ms-card2.active{border-color:rgba(194,65,12,0.5);box-shadow:0 6px 18px rgba(194,65,12,0.08);background:#fffdf6}
+.ms-card2.done{border-color:rgba(101,163,13,0.35)}
+.ms-card2-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px;flex-wrap:wrap}
+.ms-card2-head .phase{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.14em;text-transform:uppercase;font-weight:500}
+.ms-card2.active .ms-card2-head .phase{color:var(--rust)}
+.ms-card2.done .ms-card2-head .phase{color:#4d7c0f}
+.ms-card2-head .status{font-family:'Inter',sans-serif;font-size:11px;font-weight:600;padding:4px 11px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;border-radius:999px;background:#faf3e3;letter-spacing:.04em;text-transform:uppercase}
+.ms-card2.active .status{color:var(--rust);border-color:rgba(194,65,12,0.4);background:rgba(254,215,170,0.30)}
+.ms-card2.done .status{color:#4d7c0f;border-color:rgba(101,163,13,0.35);background:rgba(101,163,13,0.10)}
+.ms-card2 h3{margin:0;font-family:'Newsreader',serif;font-weight:500;font-size:20px;color:var(--ink);line-height:1.3;letter-spacing:-0.01em}
+.ms-card2 .meta{font-size:13px;color:var(--mute);margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
+.ms-card2 .meta b{color:var(--ink-2);font-weight:600}
+.ms-card2 .meta .release{color:var(--rust);font-family:'JetBrains Mono',monospace;font-weight:600}
+.ms-card2 .verify{font-size:13px;color:var(--ink-3);margin-top:14px;line-height:1.6;padding-top:14px;border-top:1px dashed var(--line-soft)}
+.ms-card2 .verify b{color:var(--ink);font-weight:600;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px;color:var(--rust)}
+@media (max-width:600px){.ms-row{grid-template-columns:48px 1fr;gap:14px}.ms-marker{width:48px;height:48px}.ms-row:not(:last-child)::before{left:23px;top:48px}}
+
+/* backers strip */
+.backers{margin-top:32px;padding:18px 0;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.backers .lbl{font-size:13px;color:var(--mute)}
+.backers .pa-stack{display:flex}
+.backers .pa{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#fed7aa,#fb923c);border:2px solid #fdfcf8;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:#7c2d12;margin-left:-10px}
+.backers .pa:first-child{margin-left:0}
+
+/* Left-column extra modules (resource asks + boost), to fill negative space */
+.left-extras{margin-top:32px;display:flex;flex-direction:column;gap:18px}
+.lx-block{padding:22px;border:1px solid var(--line);background:#fdfcf8;border-radius:6px;position:relative}
+.lx-block .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed var(--line-soft)}
+.lx-block .head .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);letter-spacing:.16em;text-transform:uppercase;font-weight:600;display:flex;align-items:center;gap:8px}
+.lx-block .head .lbl::before{content:'';width:14px;height:1px;background:var(--rust)}
+.lx-block .head .meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute)}
+
+/* Resource asks: 3-column horizontal */
+.lx-res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:600px){.lx-res-grid{grid-template-columns:1fr}}
+.lx-res{padding:14px 16px;background:#faf3e3;border:1px solid var(--line-soft);border-radius:4px}
+.lx-res .v{font-family:'Newsreader',serif;font-weight:500;font-size:28px;color:var(--ink);line-height:1;letter-spacing:-0.01em;margin-bottom:6px}
+.lx-res .v .u{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--rust);font-weight:500;margin-left:4px;vertical-align:2px}
+.lx-res .k{font-size:12px;color:var(--mute);line-height:1.4}
+
+/* Heat / momentum card under fund card */
+.heat-card{padding:20px;border:1px solid var(--line);background:#fdfcf8;border-radius:6px;position:relative}
+.heat-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.heat-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mute);letter-spacing:.18em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.heat-lbl::before{content:'';width:14px;height:1px;background:var(--rust)}
+.heat-rank{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);font-weight:600}
+.heat-stats{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:16px;padding-bottom:16px;border-bottom:1px dashed var(--line-soft)}
+.heat-stat{padding:0 4px}
+.heat-stat + .heat-stat{border-left:1px solid var(--line-soft);padding-left:18px}
+.heat-stat .hk{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mute);letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.heat-stat .hv{display:flex;align-items:baseline;gap:5px}
+.heat-stat .hv .num{font-family:'Newsreader',serif;font-weight:500;font-size:42px;color:var(--ink);line-height:1;letter-spacing:-0.02em}
+.heat-stat .hv .unit{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);font-weight:600;letter-spacing:.04em}
+.heat-stat .hv .hash{font-family:'Newsreader',serif;font-size:24px;color:var(--rust);font-weight:500;line-height:1}
+.heat-cta{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.heat-cta .you{font-size:11px;color:var(--mute);font-family:'JetBrains Mono',monospace;line-height:1.4}
+.heat-cta .you b{color:var(--rust);font-weight:700}
+.heat-cta button{padding:9px 16px;border:1px solid var(--rust);background:rgba(254,215,170,0.30);color:var(--rust);font-family:'Inter',sans-serif;font-weight:600;font-size:12px;letter-spacing:.06em;border-radius:3px;cursor:pointer;transition:all .2s;text-transform:uppercase;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.heat-cta button:hover{background:var(--rust);color:#faf3e3}
+</style>
+</head>
+<body>
+
+<div class="bportrait-bg"></div>
+
+<nav class="bnav">
+  <div class="left">
+    <a class="brand" href="index.html"><img class="brand-mark" src="logo-mark.png" alt="" /><span>AuraSci</span></a>
+  </div>
+  <div class="links">
+    <a href="market.html" class="on">Market</a>
+    <a href="dashboard-patron.html">Portfolio</a>
+    <span class="muted">Governance</span>
+    <a href="leaderboard.html">Leaderboard</a>
+  </div>
+</nav>
+
+<section class="bpage">
+  <div class="bpage-inner fade-in">
+    <a href="market.html" class="back">← Back to market</a>
+
+    <div class="detail-grid">
+      <div>
+        <div class="ticker-line">
+          <span>$CELL-01</span><span class="sep">·</span>
+          <span></span><span class="sep">·</span>
+          <span>Gatekeeper 94/100</span>
+        </div>
+        <h1 class="intent-title">Targeting senescent cells to reverse <em>cardiac fibrosis</em></h1>
+
+        <div class="scientist-row">
+          <div class="av-md">ER</div>
+          <div>
+            <div class="nm">Dr. Evelyn Reed</div>
+            <div class="af">Stanford University · Verified scientist</div>
+          </div>
+        </div>
+
+        <div class="tags-row">
+          <span class="bpill">Longevity</span>
+          <span class="bpill">AI-Bio</span>
+          <span class="bpill">Tier 1</span>
+          <span class="bpill verified">Screened · 94/100</span>
+        </div>
+
+        <p class="hyp">Targeting senescent cells to reverse cardiac fibrosis by innovating senescent cell elimination pathways. Our approach develops a novel mRNA-based therapeutic that selectively identifies and clears senescent cardiomyocytes, reducing fibrotic tissue accumulation and restoring cardiac function in aged hearts.</p>
+
+        <div class="ev-links">
+          <a class="ev-link" href="#">↗ GitHub</a>
+          <a class="ev-link" href="#">↗ ArXiv preprint</a>
+          <a class="ev-link" href="#">↗ Lab page</a>
+        </div>
+
+        <div class="backers">
+          <span class="lbl">Backed by</span>
+          <span class="bpill">Advaita Labs</span>
+          <div class="pa-stack">
+            <div class="pa">DL</div><div class="pa">CM</div><div class="pa">AW</div><div class="pa">+47</div>
+          </div>
+        </div>
+
+        <div class="left-extras">
+          <div class="lx-block">
+            <div class="head">
+              <div class="lbl">Resource asks · Lab requirements</div>
+              <div class="meta">3 categories</div>
+            </div>
+            <div class="lx-res-grid">
+              <div class="lx-res">
+                <div class="v">500<span class="u">hrs</span></div>
+                <div class="k">H100 GPU compute · biomarker training</div>
+              </div>
+              <div class="lx-res">
+                <div class="v">2<span class="u">runs</span></div>
+                <div class="k">Sequencing · bulk RNA + scRNA</div>
+              </div>
+              <div class="lx-res">
+                <div class="v">3<span class="u">mo</span></div>
+                <div class="k">Wet-lab access · BSL-2 facility</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Funding side -->
+      <aside class="fund-side">
+        <div class="fund-card">
+          <div class="fund-stamp"><span class="dot"></span>Fund this research · Open</div>
+          <div class="fund-num">Total committed · escrow live</div>
+          <div class="fund-amt"><span class="cur">$</span>120,000</div>
+          <div class="fund-goal">of <b>$150,000</b> goal</div>
+
+          <div class="bprog" style="margin-top:18px;height:10px"><span style="width:80%"></span></div>
+          <div class="fund-pct"><span class="hl">80% complete</span><span>$30,000 to go</span></div>
+
+          <div class="fund-input">
+            <input class="binput" type="number" placeholder="Enter USDC amount" />
+          </div>
+          <div class="fund-quick">
+            <button>$100</button>
+            <button>$500</button>
+            <button>$1,000</button>
+            <button>$5,000</button>
+          </div>
+          <button class="fund-cta">Fund this research <span class="arr">→</span></button>
+
+          <div class="fund-trust">
+            <div class="tr">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <span>Funds escrowed in smart contract — released only on AI-verified milestone proof.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="heat-card">
+          <div class="heat-head">
+            <div class="heat-lbl">Aura heat</div>
+            <div class="heat-rank">Longevity tier</div>
+          </div>
+          <div class="heat-stats">
+            <div class="heat-stat">
+              <div class="hk">Current heat</div>
+              <div class="hv"><span class="num">10</span><span class="unit">aura</span></div>
+            </div>
+            <div class="heat-stat">
+              <div class="hk">Rank</div>
+              <div class="hv"><span class="hash">#</span><span class="num">1</span><span class="unit">/ 47</span></div>
+            </div>
+          </div>
+          <div class="heat-cta">
+            <div class="you">You have <b>50 Aura</b> this season</div>
+            <button>Boost ↑</button>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+
+    <!-- Unified milestone trajectory: timeline + detail merged -->
+    <div class="ms-unified">
+      <div class="ms-unified-head">
+        <h2>Milestone <em>trajectory</em></h2>
+        <div class="sub">M0 → SSR · 18 month horizon · 6 phases</div>
+      </div>
+
+      <div class="ms-rail">
+
+        <div class="ms-row done">
+          <div class="ms-marker"><span class="lbl">M0</span><span class="ph">Fund</span></div>
+          <div class="ms-card2 done">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 0 · Fundraising</span>
+              <span class="status">✓ Completed</span>
+            </div>
+            <h3>Reach M0 quorum and open escrow</h3>
+            <div class="meta"><span><b>Closed</b></span><span class="release">$120,000 USDC committed</span></div>
+          </div>
+        </div>
+
+        <div class="ms-row active">
+          <div class="ms-marker"><span class="lbl">M1</span><span class="ph">Data</span></div>
+          <div class="ms-card2 active">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 1 · Dataset compilation</span>
+              <span class="status">In progress</span>
+            </div>
+            <h3>Compile comprehensive senescent cell biomarker dataset from cardiac tissue samples</h3>
+            <div class="meta"><span><b>Est. 3 months</b></span><span class="release">Releases $40,000 USDC</span></div>
+            <div class="verify"><b>Gatekeeper verification</b>Dataset passes quality audit with &gt;95% annotation accuracy and reproducible pre-processing pipeline.</div>
+          </div>
+        </div>
+
+        <div class="ms-row">
+          <div class="ms-marker"><span class="lbl">M2</span><span class="ph">Vitro</span></div>
+          <div class="ms-card2">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 2 · In-vitro validation</span>
+              <span class="status">Locked</span>
+            </div>
+            <h3>Demonstrate selective senescent cell clearance in vitro cardiac tissue models</h3>
+            <div class="meta"><span><b>Est. 6 months</b></span><span class="release">Releases $55,000 USDC</span></div>
+            <div class="verify"><b>Gatekeeper verification</b>Peer-reviewed preprint published with reproducible protocol; in-vitro clearance rate &gt;70% vs control.</div>
+          </div>
+        </div>
+
+        <div class="ms-row">
+          <div class="ms-marker"><span class="lbl">M3</span><span class="ph">Vivo</span></div>
+          <div class="ms-card2">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 3 · Murine validation</span>
+              <span class="status">Locked</span>
+            </div>
+            <h3>Validate therapeutic efficacy in murine cardiac fibrosis model</h3>
+            <div class="meta"><span><b>Est. 12 months</b></span><span class="release">Releases $55,000 USDC</span></div>
+            <div class="verify"><b>Gatekeeper verification</b>Statistical significance p&lt;0.05 in primary endpoints; AI replicates analysis from raw data.</div>
+          </div>
+        </div>
+
+        <div class="ms-row">
+          <div class="ms-marker"><span class="lbl">R</span><span class="ph">Result</span></div>
+          <div class="ms-card2">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 4 · Result attestation</span>
+              <span class="status">Locked</span>
+            </div>
+            <h3>Publish open-access manuscript and dataset for peer replication</h3>
+            <div class="meta"><span><b>Est. 15 months</b></span><span class="release">Final escrow release</span></div>
+          </div>
+        </div>
+
+        <div class="ms-row">
+          <div class="ms-marker"><span class="lbl">SSR</span><span class="ph">Award</span></div>
+          <div class="ms-card2">
+            <div class="ms-card2-head">
+              <span class="phase">Phase 5 · Replication award</span>
+              <span class="status">Locked</span>
+            </div>
+            <h3>Independent replication confirms findings — SSR award unlocked</h3>
+            <div class="meta"><span><b>Est. 18 months</b></span><span class="release">Backers receive Aura yield</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="bcorner-bl">
+  <div class="bars"><span></span><span></span><span></span><span></span><span></span></div>
+  <div>$CELL-01 / Gen-seq-094<br/>TCTAGCATGC · trust loop</div>
+</div>
+<div class="bcorner-br">
+  <span class="blink"></span>Status · escrow live<br/><b>$120,000 USDC</b> committed
+</div>
+
+<script src="auth-stub.js?v=5"></script>
+<script src="coming-soon.js?v=3"></script>
+<script src="/solana-integration.js?v=13" defer></script>
+<!--aurasci-bug-fix-funding--><script>
+(function(){
+  // ── Hydrate from the user's actual published intent (set by create-intent's
+  //    __startSetuPublish into localStorage.aurasci.intent.current). If the
+  //    URL has ?ticker=<slug>, prefer the matching intent. Otherwise fall back
+  //    to the current intent. If neither exists, leave the mock content.
+  function fmtUSD(n){
+    if (!isFinite(n)) n = 0;
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+  function qs(sel, root){ return (root || document).querySelector(sel); }
+  function setTxt(el, val){ if (el && val && el.textContent !== val) el.textContent = val; }
+
+  try {
+    var url   = new URLSearchParams(location.search);
+    var urlS  = url.get('ticker');
+    var data  = null;
+    try { data = JSON.parse(localStorage.getItem('aurasci.intent.current') || 'null'); } catch(_){}
+
+    // Only hydrate if either (a) URL ticker matches saved intent, or (b) no
+    // URL ticker but a saved intent exists.
+    var matches = !urlS || (data && data.slug && urlS.toLowerCase() === data.slug.toLowerCase());
+
+    if (data && matches) {
+      // ── Top ticker line
+      var tickerSpan = qs('.ticker-line span:first-child');
+      if (tickerSpan && data.ticker) setTxt(tickerSpan, data.ticker);
+
+      // ── Title (drop the <em>cardiac fibrosis</em> highlight when replacing
+      //    so the user's real title shows verbatim)
+      var titleEl = qs('.intent-title');
+      if (titleEl && data.title) {
+        titleEl.textContent = data.title;
+      }
+
+      // ── Hypothesis (use as paragraph copy)
+      var hyp = qs('.hyp');
+      if (hyp && data.hypothesis) setTxt(hyp, data.hypothesis);
+
+      // ── Funding goal / committed / progress
+      var total = +data.total || 0;
+      var raisedVal = +(localStorage.getItem('aurasci.intent.raised') || 0);
+      if (total > 0) {
+        var fundAmt = qs('.fund-amt');
+        if (fundAmt) fundAmt.innerHTML = '<span class="cur">$</span>' +
+          Math.round(raisedVal).toLocaleString('en-US');
+        var goalB = qs('.fund-goal b');
+        if (goalB) goalB.textContent = fmtUSD(total);
+        var pct = total > 0 ? Math.min(100, Math.round((raisedVal / total) * 100)) : 0;
+        var pctHl = qs('.fund-pct .hl');
+        if (pctHl) pctHl.textContent = pct + '% complete';
+        var toGo = document.querySelectorAll('.fund-pct span');
+        if (toGo.length >= 2) toGo[toGo.length - 1].textContent =
+          fmtUSD(Math.max(0, total - raisedVal)) + ' to go';
+        var bprog = qs('.bprog span');
+        if (bprog) bprog.style.width = pct + '%';
+      }
+
+      // ── Bottom-right status corner (committed USDC)
+      var brB = qs('.bcorner-br b');
+      if (brB) brB.textContent = fmtUSD(raisedVal) + ' USDC';
+
+      // ── Footer ticker line ($CELL-01 / Gen-seq-094)
+      var blDiv = qs('.bcorner-bl div:last-child');
+      if (blDiv && data.ticker) {
+        blDiv.innerHTML = data.ticker + ' / Gen-seq-094<br/>TCTAGCATGC · trust loop';
+      }
+
+      // ── Resource asks (replace the 3 lx-res cards with user's real picks)
+      if (data.resources && data.resources.length) {
+        var resGrid = qs('.lx-res-grid');
+        if (resGrid) {
+          resGrid.innerHTML = data.resources.map(function(r){
+            // Try to parse a leading number + unit from the heading (e.g.
+            // "500 H100 GPU hrs" → value "500", unit "hrs", rest as detail)
+            var m = (r.a || '').match(/^(\d[\d,]*)\s*([A-Za-z]+)?\s*(.*)$/);
+            var v = m ? m[1] : '·';
+            var u = m && m[2] ? m[2] : '';
+            var k = m && m[3] ? m[3] : r.a;
+            return '<div class="lx-res">' +
+              '<div class="v">' + v + (u ? '<span class="u">' + u + '</span>' : '') + '</div>' +
+              '<div class="k">' + k + (r.b ? ' · ' + r.b : '') + '</div>' +
+            '</div>';
+          }).join('');
+        }
+        var lxMeta = qs('.lx-block .head .meta');
+        if (lxMeta) lxMeta.textContent = data.resources.length + ' categor' +
+          (data.resources.length === 1 ? 'y' : 'ies');
+      }
+    }
+
+    // ── Scientist row — pull from the verified onboarding profile
+    var scName   = localStorage.getItem('aurasci.scientist.name');
+    var scAff    = localStorage.getItem('aurasci.scientist.affiliation');
+    var scAvatar = localStorage.getItem('aurasci.scientist.avatar');
+    if (scName) {
+      var nm = qs('.scientist-row .nm');
+      if (nm) nm.textContent = scName;
+      var avEl = qs('.av-md');
+      if (avEl) {
+        if (scAvatar) {
+          avEl.innerHTML =
+            '<img src="' + scAvatar +
+            '" alt="" style="width:100%;height:100%;border-radius:inherit;object-fit:cover"/>';
+        } else {
+          // Initials from the real name
+          var initials = scName.split(/\s+/).map(function(p){return (p[0]||'').toUpperCase();}).join('').slice(0,2);
+          avEl.textContent = initials || 'YOU';
+        }
+      }
+    }
+    if (scAff) {
+      var afEl = qs('.scientist-row .af');
+      if (afEl) afEl.textContent = scAff + ' · Verified scientist';
+    }
+
+    // ── Back-compat with the older raised/goal URL params (kept for any
+    //    pre-existing deep links into this page).
+    var raised = url.get('raised') || localStorage.getItem('aurasci.intent.raised');
+    var goal   = url.get('goal')   || localStorage.getItem('aurasci.intent.goal');
+    if (raised) document.querySelectorAll('[data-raised], .raised-amount')
+      .forEach(function(el){ el.textContent = fmtUSD(+raised); });
+    if (goal)   document.querySelectorAll('[data-goal], .goal-amount')
+      .forEach(function(el){ el.textContent = fmtUSD(+goal); });
+  } catch(e){
+    console.warn('[intent-detail] hydrate failed:', e);
+  }
+})();
+</script>
+</body>
+</html>

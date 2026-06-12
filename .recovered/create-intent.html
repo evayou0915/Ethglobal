@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AuraSci — Create Intent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="bust-theme.css?v=3" />
+<style>
+.pg-head{margin-bottom:30px}
+.pg-head .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);letter-spacing:.18em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.pg-head .eyebrow::before{content:'';width:18px;height:1px;background:var(--rust)}
+.pg-head h1{font-family:'Newsreader',serif;font-weight:500;font-size:clamp(2rem,3.6vw,2.8rem);color:var(--ink);margin:0 0 10px;letter-spacing:-0.01em;line-height:1.05}
+.pg-head h1 em{font-style:italic;color:var(--rust)}
+.pg-head p{font-size:15px;color:var(--ink-3);margin:0;max-width:580px;line-height:1.6}
+
+.stepper{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:32px}
+.step-num{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;background:#fdfcf8;color:var(--mute);border:1px solid var(--line);transition:all .25s}
+.step-num.active{background:var(--rust);color:#faf3e3;border-color:var(--rust);box-shadow:0 0 0 4px rgba(194,65,12,0.12)}
+.step-num.done{background:#65a30d;color:#faf3e3;border-color:#65a30d}
+.step-line{width:54px;height:1px;background:rgba(58,36,24,0.2);transition:all .25s}
+.step-line.done{background:#65a30d}
+
+.form-card{padding:30px;border-radius:6px;border:1px solid var(--line);background:#fdfcf8;position:relative}
+.form-card::before,.form-card::after{content:'';position:absolute;width:16px;height:16px;border:1.5px solid var(--rust);opacity:.5}
+.form-card::before{top:-1px;left:-1px;border-right:none;border-bottom:none}
+.form-card::after{bottom:-1px;right:-1px;border-left:none;border-top:none}
+.form-card h2{font-family:'Newsreader',serif;font-weight:500;font-size:22px;color:var(--ink);margin:0 0 6px;display:flex;align-items:center;gap:10px;letter-spacing:-0.01em}
+.form-card .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);margin:0 0 24px;letter-spacing:.08em;text-transform:uppercase}
+
+.pane{display:none}
+.pane.active{display:block}
+
+label{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--mute);margin-bottom:8px;letter-spacing:.12em;text-transform:uppercase}
+.field{margin-bottom:20px}
+.input{width:100%;padding:13px 14px;border-radius:6px;border:1px solid var(--line);background:#faf3e3;font-family:'Inter',sans-serif;font-size:14px;color:var(--ink);transition:all .2s;box-sizing:border-box}
+.input:focus{outline:none;border-color:var(--rust);background:#fffaee;box-shadow:0 0 0 3px rgba(194,65,12,0.10)}
+textarea.input{resize:vertical;min-height:120px;line-height:1.6;font-family:inherit}
+.req{color:var(--rust)}
+
+.tag-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:rgba(254,215,170,0.40);border:1px solid rgba(194,65,12,0.3);color:var(--rust);font-size:12px;font-weight:500;font-family:'JetBrains Mono',monospace;margin-right:6px;margin-bottom:6px}
+
+.ms-block{padding:20px;border-radius:6px;border:1px solid var(--line);background:#faf3e3;margin-bottom:14px;position:relative}
+.ms-block::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rust);border-radius:6px 0 0 6px}
+.ms-block .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ms-num{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--rust);letter-spacing:.14em;text-transform:uppercase}
+.ms-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:600px){.ms-row{grid-template-columns:1fr}}
+.icon-btn{background:none;border:none;color:var(--mute);cursor:pointer;padding:6px;border-radius:4px;transition:all .2s}
+.icon-btn:hover{color:var(--rust);background:rgba(194,65,12,0.06)}
+.add-ms{width:100%;padding:14px;border-radius:6px;border:1.5px dashed rgba(194,65,12,0.5);background:rgba(254,215,170,0.18);color:var(--rust);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s}
+.add-ms:hover{background:rgba(254,215,170,0.35);border-color:var(--rust)}
+
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:600px){.res-grid{grid-template-columns:1fr}}
+.res-card{padding:16px;border-radius:6px;border:1px solid var(--line);background:#faf3e3;text-align:left;cursor:pointer;transition:all .2s;font-family:inherit}
+.res-card:hover{border-color:rgba(194,65,12,0.5)}
+.res-card.selected{border-color:var(--rust);background:rgba(254,215,170,0.30);box-shadow:0 4px 12px rgba(194,65,12,0.10)}
+.res-card .a{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.res-card .b{font-size:12px;color:var(--mute);line-height:1.4}
+
+.preview-box{margin-top:24px;padding:20px;border-radius:6px;background:rgba(254,215,170,0.30);border:1px solid rgba(194,65,12,0.35);position:relative}
+.preview-box .l{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--rust);letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
+.preview-ticker{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:700;color:var(--ink);letter-spacing:-0.01em}
+.preview-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);margin-top:6px}
+
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:600px){.review-grid{grid-template-columns:1fr}}
+.review-cell{padding:14px;border-radius:6px;background:#faf3e3;border:1px solid var(--line)}
+.review-cell .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.review-cell .v{font-family:'Newsreader',serif;font-size:17px;color:var(--ink);line-height:1.4}
+.review-list{padding:18px;border-radius:6px;background:#faf3e3;border:1px solid var(--line);margin-bottom:18px}
+.review-list .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.review-row{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(58,36,24,0.08);font-size:13px;color:var(--ink-2);gap:12px}
+.review-row:last-child{border-bottom:none}
+.review-row .l{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);letter-spacing:.1em;text-transform:uppercase;min-width:60px}
+.review-row .d{flex:1;color:var(--ink)}
+.review-row .a{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--ink)}
+
+/* contenteditable affordance — subtle until hovered */
+[contenteditable="true"]{cursor:text;border-radius:3px;transition:background .15s,box-shadow .15s;padding:1px 4px;margin:-1px -4px}
+[contenteditable="true"]:hover{background:rgba(254,215,170,0.30)}
+[contenteditable="true"]:focus{outline:none;background:#fffaee;box-shadow:inset 0 0 0 1.5px var(--rust)}
+
+.attest{margin:18px 0 6px;padding:16px;border-radius:6px;background:rgba(101,163,13,0.06);border:1px solid rgba(101,163,13,0.30);display:flex;align-items:flex-start;gap:12px;font-size:13px;color:#3f5e0d;line-height:1.6;font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none}
+.attest input{margin-top:3px;accent-color:#65a30d;flex:none}
+
+.form-foot{margin-top:32px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-back{padding:13px 22px;border-radius:6px;background:transparent;border:1px solid var(--line);color:var(--ink-2);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s}
+.btn-back:hover{border-color:var(--rust);color:var(--rust)}
+.btn-next{padding:13px 26px;border-radius:6px;background:var(--ink);border:none;color:#faf3e3;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.btn-next:hover{background:var(--rust)}
+.btn-next[disabled]{opacity:.4;cursor:not-allowed}
+.btn-next[disabled]:hover{background:var(--ink)}
+
+/* ============ STEP 4: SETU PUBLISH ============ */
+.setu-stage{position:relative;padding:8px 0 0}
+.setu-intro{text-align:center;margin-bottom:30px}
+.setu-intro .pulse-ring{position:relative;width:88px;height:88px;margin:0 auto 18px}
+.setu-intro .pulse-ring::before,.setu-intro .pulse-ring::after{content:'';position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--rust);animation:setu-pulse 2.4s cubic-bezier(.4,0,.6,1) infinite;opacity:0}
+.setu-intro .pulse-ring::after{animation-delay:1.2s}
+.setu-intro .pulse-core{position:absolute;inset:18px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fde6c4,#c2410c 75%);box-shadow:0 6px 20px -4px rgba(194,65,12,0.45),inset 0 0 16px rgba(255,220,180,0.5);display:flex;align-items:center;justify-content:center;color:#faf3e3;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;letter-spacing:0.08em}
+@keyframes setu-pulse{0%{transform:scale(.9);opacity:.55}100%{transform:scale(1.7);opacity:0}}
+.setu-intro h3{font-family:'Newsreader',serif;font-style:italic;font-weight:500;font-size:26px;color:var(--ink);margin:0 0 8px;letter-spacing:-0.01em}
+.setu-intro p{font-size:14px;color:var(--ink-3);margin:0 auto;max-width:480px;line-height:1.6}
+
+
+
+.setu-phases{position:relative;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;background:#faf3e3;overflow:hidden}
+.setu-phases::before{content:'';position:absolute;left:34px;top:60px;bottom:60px;width:2px;background:linear-gradient(180deg,rgba(58,36,24,0.15),rgba(58,36,24,0.05));z-index:0}
+.setu-phase{position:relative;display:flex;gap:18px;padding:22px 22px;border-bottom:1px solid rgba(58,36,24,0.08);transition:background .35s}
+.setu-phase:last-child{border-bottom:none}
+.setu-phase.active{background:rgba(254,215,170,0.30)}
+.setu-phase.done{background:rgba(101,163,13,0.05)}
+
+.setu-phase .marker{position:relative;z-index:1;width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(58,36,24,0.30);background:#fdfcf8;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--mute);flex-shrink:0;transition:all .35s}
+.setu-phase.active .marker{border-color:var(--rust);background:var(--rust);color:#faf3e3;box-shadow:0 0 0 5px rgba(194,65,12,0.18);animation:marker-spin 1.6s linear infinite}
+.setu-phase.done .marker{border-color:#65a30d;background:#65a30d;color:#faf3e3}
+@keyframes marker-spin{to{box-shadow:0 0 0 8px rgba(194,65,12,0.0)}0%,40%{box-shadow:0 0 0 5px rgba(194,65,12,0.18)}}
+
+.setu-phase .body{flex:1;min-width:0}
+.setu-phase .row1{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:6px}
+.setu-phase .ttl{font-family:'Newsreader',serif;font-size:18px;font-weight:500;color:var(--ink);letter-spacing:-0.005em}
+.setu-phase .stat{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+.setu-phase.active .stat{color:var(--rust)}
+.setu-phase.done .stat{color:#4d7c0f}
+.setu-phase .stat .blink{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block;animation:blink 1s ease-in-out infinite}
+@keyframes blink{50%{opacity:.3}}
+.setu-phase .desc{font-size:13px;color:var(--ink-3);line-height:1.55;margin:0 0 10px}
+
+.setu-phase .log{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:0;text-transform:none;background:rgba(58,36,24,0.04);border:1px solid rgba(58,36,24,0.10);border-radius:4px;padding:8px 10px;max-height:0;overflow:hidden;transition:max-height .4s ease,padding .4s ease,opacity .25s;opacity:0}
+.setu-phase.active .log,.setu-phase.done .log{max-height:120px;padding:10px;opacity:1}
+.setu-phase .log .line{display:block;line-height:1.55;color:var(--ink-2)}
+.setu-phase .log .line .t{color:var(--rust);margin-right:8px}
+.setu-phase.done .log .line .t{color:#4d7c0f}
+
+/* phase 3: agent dots */
+.setu-agents{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.agent-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:#fdfcf8;border:1px solid rgba(58,36,24,0.18);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mute);letter-spacing:.06em;transition:all .3s}
+.agent-chip .dot{width:6px;height:6px;border-radius:50%;background:rgba(58,36,24,0.25);transition:background .3s,box-shadow .3s}
+.agent-chip.voted{border-color:rgba(101,163,13,0.45);background:rgba(101,163,13,0.08);color:#4d7c0f}
+.agent-chip.voted .dot{background:#65a30d;box-shadow:0 0 0 3px rgba(101,163,13,0.18)}
+
+/* completion banner */
+.setu-done{display:none;margin-top:22px;padding:22px 24px;border-radius:8px;background:linear-gradient(135deg,rgba(101,163,13,0.10),rgba(101,163,13,0.04));border:1px solid rgba(101,163,13,0.40);align-items:center;gap:18px}
+.setu-done.show{display:flex;animation:done-in .5s ease both}
+@keyframes done-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.setu-done .seal{width:54px;height:54px;border-radius:50%;background:#65a30d;color:#faf3e3;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 22px -6px rgba(101,163,13,0.45)}
+.setu-done .text{flex:1}
+.setu-done .text .a{font-family:'Newsreader',serif;font-size:20px;color:var(--ink);font-weight:500;letter-spacing:-0.01em;margin-bottom:4px}
+.setu-done .text .a em{font-style:italic;color:#4d7c0f}
+.setu-done .text .b{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.06em}
+</style>
+</head>
+<body>
+
+<div class="bportrait-bg"></div>
+
+<nav class="bnav">
+  <div class="left">
+    <a class="brand" href="index.html"><img class="brand-mark" src="logo-mark.png" alt="" /><span>AuraSci</span></a>
+  </div>
+  <div class="links">
+    <a href="market.html">Market</a>
+    <a href="dashboard-patron.html">Portfolio</a>
+    <span class="muted">Governance</span>
+    <a href="leaderboard.html">Leaderboard</a>
+  </div>
+</nav>
+
+<section class="bpage">
+  <div class="bpage-inner fade-in" style="max-width:780px">
+    <div class="pg-head">
+      <div class="eyebrow">Create · Intent Asset</div>
+      <h1>Define your research <em>milestones.</em></h1>
+      <p>Break the work into 3 verifiable milestones, then publish to the Setu Network for agent consensus review.</p>
+    </div>
+
+    <div class="stepper">
+      <div class="step-num active" data-num="1">1</div>
+      <div class="step-line" data-line="1-2"></div>
+      <div class="step-num" data-num="2">2</div>
+      <div class="step-line" data-line="2-3"></div>
+      <div class="step-num" data-num="3">3</div>
+      <div class="step-line" data-line="3-4"></div>
+      <div class="step-num" data-num="4">4</div>
+    </div>
+
+    <div class="form-card">
+
+      <!-- ============ STEP 1: BLUEPRINT ============ -->
+      <div class="pane active" data-pane="1">
+        <div class="sub">Step 01 · Research blueprint</div>
+        <h2>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Title, hypothesis & tags
+        </h2>
+
+        <div class="field">
+          <label>Title <span class="req">*</span></label>
+          <input class="input" id="f-title" type="text" value="Targeting senescent cells to reverse cardiac fibrosis" />
+        </div>
+
+        <div class="field">
+          <label>Hypothesis <span class="req">*</span></label>
+          <textarea class="input" id="f-hyp">Senescent cells accumulate in aged cardiac tissue, driving fibrosis and dysfunction. Selective elimination via mRNA-based therapeutic should reverse fibrosis and restore cardiac function in murine models.</textarea>
+        </div>
+
+        <div class="field">
+          <label>Tags</label>
+          <div>
+            <span class="tag-chip">#Longevity</span>
+            <span class="tag-chip">#AI-Bio</span>
+            <span class="tag-chip">#Tier-1</span>
+          </div>
+          <input class="input" type="text" placeholder="Add tag and press Enter..." style="margin-top:8px" />
+        </div>
+
+        <div class="form-foot">
+          <a class="btn-back" href="dashboard-scientist.html" style="text-decoration:none">← Cancel</a>
+          <button class="btn-next" data-go="2">Continue to milestones <span style="font-family:'JetBrains Mono',monospace">↗</span></button>
+        </div>
+      </div>
+
+      <!-- ============ STEP 2: MILESTONES ============ -->
+      <div class="pane" data-pane="2">
+        <div class="sub">Step 02 · Milestone definition</div>
+        <h2>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Milestones · 02/03
+        </h2>
+
+        <div class="ms-block">
+          <div class="head">
+            <span class="ms-num">M1 — Dataset</span>
+            <button class="icon-btn" title="Remove">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Description</label>
+            <input class="input" type="text" id="f-m1-desc" value="Compile comprehensive senescent cell biomarker dataset from cardiac tissue samples" />
+          </div>
+          <div class="ms-row">
+            <div class="field" style="margin-bottom:0">
+              <label>Verification criteria</label>
+              <input class="input" type="text" id="f-m1-crit" value="Dataset passes quality audit · >95% annotation accuracy" />
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Release amount (USDC)</label>
+              <input class="input" type="number" id="f-m1-amt" value="40000" />
+            </div>
+          </div>
+        </div>
+
+        <div class="ms-block">
+          <div class="head">
+            <span class="ms-num">M2 — In-vitro</span>
+            <button class="icon-btn" title="Remove">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Description</label>
+            <input class="input" type="text" id="f-m2-desc" value="Demonstrate selective senescent cell clearance in vitro cardiac tissue models" />
+          </div>
+          <div class="ms-row">
+            <div class="field" style="margin-bottom:0">
+              <label>Verification criteria</label>
+              <input class="input" type="text" id="f-m2-crit" value="Peer-reviewed preprint · reproducible protocol on bioRxiv" />
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Release amount (USDC)</label>
+              <input class="input" type="number" id="f-m2-amt" value="55000" />
+            </div>
+          </div>
+        </div>
+
+        <div class="ms-block">
+          <div class="head">
+            <span class="ms-num">M3 — In-vivo · final</span>
+            <button class="icon-btn" title="Remove">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+          <div class="field" style="margin-bottom:12px">
+            <label>Description</label>
+            <input class="input" type="text" id="f-m3-desc" value="Validate cardiac function recovery in murine model post senolytic treatment" />
+          </div>
+          <div class="ms-row">
+            <div class="field" style="margin-bottom:0">
+              <label>Verification criteria</label>
+              <input class="input" type="text" id="f-m3-crit" value="Echocardiogram + histology · ≥30% fibrosis reduction (n≥12)" />
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>Release amount (USDC)</label>
+              <input class="input" type="number" id="f-m3-amt" value="35000" />
+            </div>
+          </div>
+        </div>
+
+        <button class="add-ms">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add another milestone
+        </button>
+
+        <div class="field" style="margin-top:24px">
+          <label style="display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+            Resource asks
+          </label>
+          <div class="res-grid">
+            <div class="res-card selected" data-res="gpu" id="res-gpu">
+              <div class="a">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+                <span contenteditable="true" spellcheck="false" style="outline:none;border-bottom:1px dashed transparent" onfocus="this.style.borderBottomColor='#cc5d35'" onblur="this.style.borderBottomColor='transparent'">500 H100 GPU hrs</span>
+              </div>
+              <div class="b"><span contenteditable="true" spellcheck="false" style="border-bottom:1px dashed #cc5d35;padding:0 2px;color:#cc5d35;outline:none">describe what the compute is for</span></div>
+            </div>
+            <div class="res-card" data-res="lab" id="res-lab">
+              <div class="a">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--mute)"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+                <span contenteditable="true" spellcheck="false" style="outline:none;border-bottom:1px dashed transparent" onfocus="this.style.borderBottomColor='#cc5d35'" onblur="this.style.borderBottomColor='transparent'">Wet lab access</span>
+              </div>
+              <div class="b"><span contenteditable="true" spellcheck="false" style="outline:none;border-bottom:1px dashed transparent" onfocus="this.style.borderBottomColor='#cc5d35'" onblur="this.style.borderBottomColor='transparent'">BSL-2 facility for in vitro experiments</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview-box">
+          <div class="l">Asset ticker · auto-generated from title, click to override</div>
+          <div class="preview-ticker" id="prev-ticker" contenteditable="true" spellcheck="false" style="cursor:text;outline:none;border-bottom:1px dashed transparent;transition:border-color .15s" onfocus="this.style.borderBottomColor='#cc5d35'" onblur="this.style.borderBottomColor='transparent'">$CELL-01</div>
+          <div class="preview-meta" id="prev-meta">Total ask · $130,000 USDC · 03 milestones · season 094</div>
+        </div>
+
+        <div class="form-foot">
+          <button class="btn-back" data-go="1">← Back</button>
+          <button class="btn-next" data-go="3">Continue to review <span style="font-family:'JetBrains Mono',monospace">↗</span></button>
+        </div>
+      </div>
+
+      <!-- ============ STEP 3: REVIEW ============ -->
+      <div class="pane" data-pane="3">
+        <div class="sub">Step 03 · Review & submit</div>
+        <h2>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Review and submit for Setu inscription
+        </h2>
+
+        <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:0.06em;margin:0 0 16px">Editable preview · changes here sync back to step 01 / 02.</p>
+
+        <div class="review-grid">
+          <div class="review-cell">
+            <div class="k">Ticker</div>
+            <div class="v" id="r-ticker" style="font-family:'JetBrains Mono',monospace;font-weight:700" contenteditable="true">$CELL-01</div>
+          </div>
+          <div class="review-cell">
+            <div class="k">Total ask</div>
+            <div class="v" id="r-total">$130,000 USDC</div>
+          </div>
+          <div class="review-cell">
+            <div class="k">Title</div>
+            <div class="v" id="r-title" contenteditable="true">Targeting senescent cells to reverse cardiac fibrosis</div>
+          </div>
+          <div class="review-cell">
+            <div class="k">Hypothesis</div>
+            <div class="v" id="r-hyp" contenteditable="true" style="font-size:14px;line-height:1.5">—</div>
+          </div>
+          <div class="review-cell" style="grid-column:1 / -1">
+            <div class="k">Season · review SLA</div>
+            <div class="v">094 · ≤ 48 h</div>
+          </div>
+        </div>
+
+        <div class="review-list">
+          <div class="k">Milestones · <span id="r-ms-count">03</span></div>
+          <div class="review-row">
+            <div class="l">M1</div>
+            <div class="d" id="r-m1-desc" contenteditable="true">Compile senescent cell biomarker dataset</div>
+            <div class="a" id="r-m1-amt" contenteditable="true">$40k</div>
+          </div>
+          <div class="review-row">
+            <div class="l">M2</div>
+            <div class="d" id="r-m2-desc" contenteditable="true">In vitro selective senescent cell clearance</div>
+            <div class="a" id="r-m2-amt" contenteditable="true">$55k</div>
+          </div>
+          <div class="review-row">
+            <div class="l">M3</div>
+            <div class="d" id="r-m3-desc" contenteditable="true">Murine model · ≥30% fibrosis reduction</div>
+            <div class="a" id="r-m3-amt" contenteditable="true">$35k</div>
+          </div>
+        </div>
+
+        <div class="review-list">
+          <div class="k">Resource asks · 01</div>
+          <div class="review-row">
+            <div class="l">GPU</div>
+            <div class="d"><span contenteditable="true" style="border-bottom:1px dashed #cc5d35;padding:0 2px;color:#cc5d35">enter GPU hrs needed</span></div>
+            <div class="a">included</div>
+          </div>
+        </div>
+
+        <label class="attest">
+          <input type="checkbox" id="attest-box" />
+          <span>I attest the data and milestones above are accurate. On submission, this intent will be inscribed on the Setu network and reviewed by a quorum of Gatekeeper agents before going live in the market. Once funded, milestone releases are agent-verified — no manual override.</span>
+        </label>
+
+        <div class="form-foot">
+          <button class="btn-back" data-go="2">← Back</button>
+          <button class="btn-next" id="publish-btn" disabled>Submit to Setu network <span style="font-family:'JetBrains Mono',monospace">↗</span></button>
+        </div>
+      </div>
+
+      <!-- ============ STEP 4: SETU PUBLISH ============ -->
+      <div class="pane" data-pane="4">
+        <div class="sub">Step 04 · Publish to Setu</div>
+        <h2 id="setu-h2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+          Inscribing <span id="setu-h2-ticker">$CELL-01</span> on Setu
+        </h2>
+
+        <div class="setu-stage">
+          <div class="setu-intro">
+            <div class="pulse-ring"><div class="pulse-core">SETU</div></div>
+            <h3>Your <em>intent asset</em> is going live.</h3>
+            <p>Setu records your milestone blueprint in the trust ledger and routes it to a quorum of Gatekeeper agents for consensus review.</p>
+          </div>
+
+          <div class="setu-phases">
+
+            <div class="setu-phase" data-phase="1">
+              <div class="marker">01</div>
+              <div class="body">
+                <div class="row1">
+                  <div class="ttl">Broadcast to Setu network</div>
+                  <div class="stat" data-stat="1"><span class="blink"></span>queued</div>
+                </div>
+                <p class="desc">Encoding the intent payload (title, hypothesis, milestones, resource asks) and broadcasting it across Setu nodes.</p>
+                <div class="log" data-log="1"></div>
+              </div>
+            </div>
+
+            <div class="setu-phase" data-phase="2">
+              <div class="marker">02</div>
+              <div class="body">
+                <div class="row1">
+                  <div class="ttl">Inscribe on Setu ledger</div>
+                  <div class="stat" data-stat="2"><span class="blink"></span>waiting</div>
+                </div>
+                <p class="desc">A canonical record is written to the Setu ledger — your asset gets a permanent ID, hash, and season anchor.</p>
+                <div class="log" data-log="2"></div>
+              </div>
+            </div>
+
+            <div class="setu-phase" data-phase="3">
+              <div class="marker">03</div>
+              <div class="body">
+                <div class="row1">
+                  <div class="ttl">Agent consensus review</div>
+                  <div class="stat" data-stat="3"><span class="blink"></span>waiting</div>
+                </div>
+                <p class="desc">A quorum of 5 Gatekeeper agents evaluates milestone clarity, scientific plausibility, and verification feasibility. 3 of 5 must approve.</p>
+                <div class="setu-agents" id="setu-agents">
+                  <span class="agent-chip" data-agent="ATLAS"><span class="dot"></span>ATLAS-7</span>
+                  <span class="agent-chip" data-agent="HELIX"><span class="dot"></span>HELIX-3</span>
+                  <span class="agent-chip" data-agent="ORCHID"><span class="dot"></span>ORCHID-9</span>
+                  <span class="agent-chip" data-agent="VESTA"><span class="dot"></span>VESTA-2</span>
+                  <span class="agent-chip" data-agent="LYRA"><span class="dot"></span>LYRA-5</span>
+                </div>
+                <div class="log" data-log="3" style="margin-top:10px"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="setu-done" id="setu-done">
+            <div class="seal">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="text">
+              <div class="a">Inscribed on Setu · <em id="setu-done-ticker">$CELL-01</em> is live in the market.</div>
+              <div class="b" id="setu-done-meta">setu://asset/cell-01 · season 094 · 5/5 quorum · ledger by Advaita Labs</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-foot">
+          <button class="btn-back" data-go="3" id="setu-back" style="visibility:hidden">← Back</button>
+          <a class="btn-next" id="setu-continue" href="intent-detail.html" style="visibility:hidden">Open <span id="setu-continue-ticker">$CELL-01</span> in market <span style="font-family:'JetBrains Mono',monospace">↗</span></a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="bcorner-bl">
+  <div class="bars"><span></span><span></span><span></span><span></span><span></span></div>
+  <div id="bl-meta">Draft · $CELL-01<br/></div>
+</div>
+<div class="bcorner-br" id="br-status">
+  <span class="blink"></span>Step · <b id="br-step">01/04</b><br/><b>$130,000 USDC</b> total ask
+</div>
+
+<script src="auth-stub.js?v=5"></script>
+<script src="coming-soon.js?v=3"></script>
+<script src="/solana-integration.js?v=13" defer></script>
+<script>
+(function(){
+  function $(id){ return document.getElementById(id); }
+  function fmtUSDC(n){
+    if (!isFinite(n)) n = 0;
+    return '$' + n.toLocaleString('en-US') + ' USDC';
+  }
+  function fmtShort(n){
+    if (!isFinite(n)) n = 0;
+    return '$' + Math.round(n / 1000) + 'k';
+  }
+  function parseShort(s){
+    var m = String(s||'').replace(/,/g,'').match(/(\d+(?:\.\d+)?)\s*([kKmM])?/);
+    if (!m) return 0;
+    var v = parseFloat(m[1]);
+    if (m[2] === 'k' || m[2] === 'K') v *= 1000;
+    if (m[2] === 'm' || m[2] === 'M') v *= 1e6;
+    return v;
+  }
+  function tickerFromTitle(title){
+    var w = String(title||'').match(/[A-Za-z]{3,}/g) || [];
+    var stop = ['the','and','for','with','from','that','this','open','science'];
+    w = w.filter(function(x){ return stop.indexOf(x.toLowerCase()) < 0; });
+    var pick = (w[0] || 'asset').slice(0,4).toUpperCase();
+    return '$' + pick + '-01';
+  }
+  function totalAmt(){
+    return [1,2,3].reduce(function(s,i){
+      var el = $('f-m' + i + '-amt');
+      return s + (el ? +el.value || 0 : 0);
+    }, 0);
+  }
+
+  // Track whether the user has manually edited the ticker so we stop
+  // overwriting it from the title.
+  var tickerUserEdited = false;
+  var prevTickerEl = $('prev-ticker');
+  if (prevTickerEl) {
+    prevTickerEl.addEventListener('input', function(){ tickerUserEdited = true; });
+  }
+
+  // Step 02 preview box stays in sync with title + amounts (unless the user
+  // overrode the ticker by typing into it).
+  function updatePreview(){
+    var t  = totalAmt();
+    var msCount = document.querySelectorAll('.ms-block').length;
+    var derived = tickerFromTitle($('f-title').value);
+    // Current effective ticker — respect user override
+    var current = (tickerUserEdited && $('prev-ticker'))
+      ? ($('prev-ticker').textContent || '').trim() || derived
+      : derived;
+    if ($('prev-ticker') && !tickerUserEdited) $('prev-ticker').textContent = derived;
+    if ($('prev-meta'))   $('prev-meta').textContent =
+      'Total ask · ' + fmtUSDC(t) + ' · ' + String(msCount).padStart(2,'0') +
+      ' milestones · season 094';
+    // Also refresh the bottom-left "Draft · $XXX-01" corner
+    var meta = $('bl-meta');
+    if (meta) {
+      var prevActive = document.querySelector('[data-pane].active');
+      var n = prevActive ? +prevActive.dataset.pane : 1;
+      meta.innerHTML = (n === 4)
+        ? 'Publishing · ' + current + '<br/>Setu network · live'
+        : 'Draft · ' + current;
+    }
+  }
+  ['f-title','f-m1-amt','f-m2-amt','f-m3-amt'].forEach(function(id){
+    var el = $(id); if (el) el.addEventListener('input', updatePreview);
+  });
+  updatePreview();
+
+  // Push step 01/02 → step 03 review cells
+  function pushToReview(){
+    $('r-title').textContent  = $('f-title').value || '—';
+    $('r-hyp').textContent    = $('f-hyp').value   || '—';
+    // Use whatever ticker is currently shown in step-02 preview (user may
+    // have overridden the auto-generated one)
+    var currentTicker = (($('prev-ticker') && $('prev-ticker').textContent) || '').trim()
+      || tickerFromTitle($('f-title').value);
+    $('r-ticker').textContent = currentTicker;
+    $('r-total').textContent  = fmtUSDC(totalAmt());
+
+    // Re-build the milestones review list to match however many blocks the
+    // user actually has now (handles deleted milestones).
+    var blocks = document.querySelectorAll('.ms-block');
+    var listKey = document.querySelector('[data-pane="3"] .review-list .k');
+    if (listKey) listKey.innerHTML = 'Milestones · <span id="r-ms-count">' +
+      String(blocks.length).padStart(2,'0') + '</span>';
+    var msList = document.querySelector('[data-pane="3"] .review-list');
+    if (msList) {
+      // Wipe old review-row rows, keep the header (.k)
+      msList.querySelectorAll('.review-row').forEach(function(r){ r.remove(); });
+      blocks.forEach(function(block, idx){
+        var n = idx + 1;
+        var desc = block.querySelector('input[id$="-desc"]');
+        var amt  = block.querySelector('input[id$="-amt"]');
+        var row = document.createElement('div');
+        row.className = 'review-row';
+        row.innerHTML =
+          '<div class="l">M' + n + '</div>' +
+          '<div class="d" contenteditable="true">' +
+            ((desc && desc.value) || '—') + '</div>' +
+          '<div class="a" contenteditable="true">' +
+            fmtShort(+(amt && amt.value) || 0) + '</div>';
+        msList.appendChild(row);
+      });
+    }
+
+    // Sync the Resource asks block on the review pane
+    var resList = document.querySelectorAll('[data-pane="3"] .review-list')[1];
+    if (resList) {
+      var selected = document.querySelectorAll('.res-card.selected');
+      resList.querySelectorAll('.review-row').forEach(function(r){ r.remove(); });
+      var hdr = resList.querySelector('.k');
+      if (hdr) hdr.textContent = 'Resource asks · ' +
+        String(selected.length).padStart(2,'0');
+      selected.forEach(function(card){
+        var aText = ((card.querySelector('.a') || {}).textContent || '').trim();
+        var bText = ((card.querySelector('.b') || {}).textContent || '').trim();
+        var row = document.createElement('div');
+        row.className = 'review-row';
+        row.innerHTML =
+          '<div class="l">' + (card.dataset.res || '—').toUpperCase() + '</div>' +
+          '<div class="d" contenteditable="true">' + (aText || '—') +
+            (bText ? ' · ' + bText : '') + '</div>' +
+          '<div class="a">included</div>';
+        resList.appendChild(row);
+      });
+    }
+  }
+
+  // Pull review-pane edits → step 01/02 inputs (called when leaving step 3)
+  function pullFromReview(){
+    $('f-title').value = ($('r-title').textContent || '').trim();
+    $('f-hyp').value   = ($('r-hyp').textContent   || '').trim();
+    // Also pull the (possibly user-edited) ticker back into the step-02 preview
+    var rTicker = $('r-ticker');
+    if (rTicker && $('prev-ticker')) {
+      $('prev-ticker').textContent = (rTicker.textContent || '').trim();
+      tickerUserEdited = true;
+    }
+    // Walk the review-rows in order — robust against any milestone count
+    var rows = document.querySelectorAll('[data-pane="3"] .review-list:first-of-type .review-row');
+    rows.forEach(function(row, idx){
+      var n = idx + 1;
+      var descInput = $('f-m' + n + '-desc');
+      var amtInput  = $('f-m' + n + '-amt');
+      var d = row.querySelector('.d');
+      var a = row.querySelector('.a');
+      if (descInput && d) descInput.value = (d.textContent || '').trim();
+      if (amtInput && a)  amtInput.value  = parseShort(a.textContent);
+    });
+    updatePreview();
+  }
+
+  function setStep(n){
+    var prevActive = document.querySelector('[data-pane].active');
+    var prev = prevActive ? +prevActive.dataset.pane : 0;
+    if (prev === 3 && n !== 3) pullFromReview();
+
+    document.querySelectorAll('[data-pane]').forEach(function(p){
+      p.classList.toggle('active', +p.dataset.pane === n);
+    });
+    document.querySelectorAll('.step-num').forEach(function(d){
+      var k = +d.dataset.num;
+      d.classList.toggle('done', k < n);
+      d.classList.toggle('active', k === n);
+    });
+    document.querySelectorAll('.step-line').forEach(function(l){
+      var from = +l.dataset.line.split('-')[0];
+      l.classList.toggle('done', from < n);
+    });
+    $('br-step').textContent = String(n).padStart(2,'0') + '/04';
+    var meta = $('bl-meta');
+    if (meta) {
+      var tk = tickerFromTitle($('f-title').value);
+      meta.innerHTML = (n === 4)
+        ? 'Publishing · ' + tk + '<br/>Setu network · live'
+        : 'Draft · ' + tk;
+    }
+
+    if (n === 3) pushToReview();
+    if (n === 4) { window.__startSetuPublish && window.__startSetuPublish(); }
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  document.querySelectorAll('[data-go]').forEach(function(b){
+    b.addEventListener('click', function(){ setStep(+b.dataset.go); });
+  });
+
+  // resource cards toggle (but don't toggle when the click is on an editable
+  // text span inside the card — the user is typing, not selecting)
+  document.querySelectorAll('.res-card').forEach(function(c){
+    c.addEventListener('click', function(e){
+      if (e.target.closest('[contenteditable="true"]')) return;
+      c.classList.toggle('selected');
+    });
+  });
+
+  // ── Milestone delete buttons ──
+  // Each .ms-block has a trash icon-btn. Clicking removes the block, then
+  // re-numbers the remaining ones and refreshes the preview/totals.
+  function renumberMilestones(){
+    var blocks = document.querySelectorAll('.ms-block');
+    blocks.forEach(function(block, idx){
+      var n = idx + 1;
+      var label = block.querySelector('.ms-num');
+      if (label) {
+        // Preserve any custom suffix like "— Dataset" if present
+        var txt = label.textContent || '';
+        var suffix = txt.replace(/^M\d+\s*/, '').trim();
+        label.textContent = 'M' + n + (suffix ? ' ' + suffix : '');
+      }
+      // re-id the inputs so totalAmt() keeps working
+      ['desc','crit','amt'].forEach(function(kind){
+        var el = block.querySelector('input[id^="f-m"][id$="-' + kind + '"]');
+        if (el) el.id = 'f-m' + n + '-' + kind;
+      });
+    });
+    // Refresh the "Milestones · NN/03" header
+    var header = document.querySelector('[data-pane="2"] h2');
+    if (header) {
+      header.innerHTML = header.innerHTML.replace(
+        /Milestones · \d+\/\d+/,
+        'Milestones · ' + String(blocks.length).padStart(2,'0') + '/' +
+        String(Math.max(blocks.length,3)).padStart(2,'0')
+      );
+    }
+    updatePreview();
+  }
+
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('.ms-block .icon-btn');
+    if (!btn) return;
+    e.preventDefault();
+    var blocks = document.querySelectorAll('.ms-block');
+    if (blocks.length <= 1) {
+      alert('At least one milestone is required.');
+      return;
+    }
+    var block = btn.closest('.ms-block');
+    if (block) block.remove();
+    renumberMilestones();
+  });
+
+  // Recompute preview whenever a milestone amount input changes (covers
+  // dynamically renumbered inputs too)
+  document.addEventListener('input', function(e){
+    if (e.target.matches && e.target.matches('input[id^="f-m"][id$="-amt"]'))
+      updatePreview();
+  });
+
+  // attestation gates publish
+  var box = document.getElementById('attest-box');
+  var pub = document.getElementById('publish-btn');
+  box.addEventListener('change', function(){ pub.disabled = !box.checked; });
+  pub.addEventListener('click', function(){
+    if (pub.disabled) return;
+    setStep(4);
+  });
+
+  // ===== SETU publish animation =====
+  var setuStarted = false;
+  window.__startSetuPublish = function(){
+    if (setuStarted) return;
+    setuStarted = true;
+
+    // Resolve the real ticker the user chose (auto-derived from title, or
+    // manually overridden in step 02 / step 03). Cascade fallbacks:
+    var ticker =
+      (($('r-ticker')   && $('r-ticker').textContent)   || '').trim() ||
+      (($('prev-ticker')&& $('prev-ticker').textContent)|| '').trim() ||
+      tickerFromTitle($('f-title').value) ||
+      '$ASSET-01';
+    // Stash so other pages (asset-detail, dashboard, etc.) can pick it up
+    try { localStorage.setItem('aurasci.intent.ticker', ticker); } catch(_){}
+    // slug = lowercased + strip leading $
+    var slug = ticker.replace(/^\$/, '').toLowerCase();
+
+    // Snapshot the full intent payload so the market detail page (and any
+    // future surfaces) can render the user's real data instead of mock.
+    try {
+      var intent = {
+        ticker: ticker,
+        slug: slug,
+        title: ($('f-title') && $('f-title').value) || '',
+        hypothesis: ($('f-hyp') && $('f-hyp').value) || '',
+        total: totalAmt(),
+        milestones: Array.prototype.map.call(
+          document.querySelectorAll('.ms-block'),
+          function(b){
+            return {
+              desc: (b.querySelector('input[id$="-desc"]') || {}).value || '',
+              crit: (b.querySelector('input[id$="-crit"]') || {}).value || '',
+              amt:  +((b.querySelector('input[id$="-amt"]')  || {}).value || 0)
+            };
+          }
+        ),
+        resources: Array.prototype.map.call(
+          document.querySelectorAll('.res-card.selected'),
+          function(c){
+            return {
+              a: ((c.querySelector('.a') || {}).textContent || '').trim(),
+              b: ((c.querySelector('.b') || {}).textContent || '').trim()
+            };
+          }
+        ),
+        publishedAt: new Date().toISOString()
+      };
+      localStorage.setItem('aurasci.intent.current', JSON.stringify(intent));
+      localStorage.setItem('aurasci.intent.goal', intent.total);
+      localStorage.setItem('aurasci.intent.raised', 0);
+    } catch(_){}
+
+    var setTxt = function(id, val){ var el = $(id); if (el) el.textContent = val; };
+    setTxt('setu-h2-ticker', ticker);
+    setTxt('setu-done-ticker', ticker);
+    setTxt('setu-continue-ticker', ticker);
+    var meta = $('setu-done-meta');
+    if (meta) meta.textContent =
+      'setu://asset/' + slug + ' · season 094 · 5/5 quorum · ledger by Advaita Labs';
+    // Make the "Open … in market" button carry the slug so the detail page
+    // can read the intent identifier from the URL.
+    var cont = $('setu-continue');
+    if (cont) cont.href = 'intent-detail.html?ticker=' + encodeURIComponent(slug);
+    // Patch the "cell-01 entry created" hardcoded log line
+    // by substituting into phase 2's lines below.
+
+    var phases = [
+      {
+        n: 1,
+        statRunning: 'broadcasting…',
+        statDone: 'broadcast complete',
+        lines: [
+          '[t+0.0s] sealing payload · sha256 9f4c…a3e1',
+          '[t+0.4s] dialing 12 Setu nodes · 12/12 ack',
+          '[t+0.9s] gossip propagated · ttl=6'
+        ],
+        delay: 2400
+      },
+      {
+        n: 2,
+        statRunning: 'inscribing…',
+        statDone: 'inscribed',
+        lines: [
+          '[t+1.1s] block #418,209 · ' + slug + ' entry created',
+          '[t+1.4s] anchor → season 094 · slot 0x2f1a',
+          '[t+1.7s] ledger root advanced · 0x7d…22b'
+        ],
+        delay: 2400
+      },
+      {
+        n: 3,
+        statRunning: 'reviewing…',
+        statDone: 'quorum reached',
+        lines: [
+          '[t+2.2s] ATLAS-7 — milestone schema valid',
+          '[t+2.6s] HELIX-3 — hypothesis well-formed',
+          '[t+3.0s] ORCHID-9 — verification criteria measurable',
+          '[t+3.4s] VESTA-2 — release schedule conservative',
+          '[t+3.8s] LYRA-5 — resource ask justified'
+        ],
+        delay: 4200,
+        agents: ['ATLAS','HELIX','ORCHID','VESTA','LYRA']
+      }
+    ];
+
+    function runPhase(i){
+      if (i >= phases.length) {
+        // all done
+        document.getElementById('setu-done').classList.add('show');
+        var cont = document.getElementById('setu-continue');
+        cont.style.visibility = 'visible';
+        cont.style.animation = 'done-in .5s ease both';
+        return;
+      }
+      var ph = phases[i];
+      var el = document.querySelector('.setu-phase[data-phase="' + ph.n + '"]');
+      var stat = document.querySelector('[data-stat="' + ph.n + '"]');
+      var log = document.querySelector('[data-log="' + ph.n + '"]');
+      // mark previous done
+      if (i > 0) {
+        var prev = document.querySelector('.setu-phase[data-phase="' + phases[i-1].n + '"]');
+        prev.classList.remove('active');
+        prev.classList.add('done');
+        var pStat = document.querySelector('[data-stat="' + phases[i-1].n + '"]');
+        pStat.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>' + phases[i-1].statDone;
+      }
+      el.classList.add('active');
+      stat.innerHTML = '<span class="blink"></span>' + ph.statRunning;
+      // stream log lines
+      log.innerHTML = '';
+      ph.lines.forEach(function(line, idx){
+        setTimeout(function(){
+          var span = document.createElement('span');
+          span.className = 'line';
+          var m = line.match(/^(\[[^\]]+\])\s*(.*)$/);
+          if (m) {
+            span.innerHTML = '<span class="t">' + m[1] + '</span>' + m[2];
+          } else {
+            span.textContent = line;
+          }
+          log.appendChild(span);
+          // light up agent chip if present
+          if (ph.agents) {
+            var name = ph.agents[idx];
+            if (name) {
+              var chip = document.querySelector('.agent-chip[data-agent="' + name + '"]');
+              if (chip) chip.classList.add('voted');
+            }
+          }
+        }, (idx + 1) * (ph.delay / (ph.lines.length + 1)));
+      });
+      setTimeout(function(){ runPhase(i + 1); }, ph.delay);
+    }
+
+    setTimeout(function(){ runPhase(0); }, 600);
+  };
+
+  console.log('[create-intent] v5 loaded · delete btn + editable ticker + editable resource asks + dynamic step-4 ticker');
+})();
+</script>
+<!--aurasci-bug-fix-tag-enter--><script>
+document.addEventListener('keydown',function(e){
+  var t=e.target;
+  if(e.key==='Enter' && t && t.tagName==='INPUT' && /Add tag/i.test(t.placeholder||'')){
+    e.preventDefault();
+    var v=(t.value||'').trim();
+    if(v==='')return;
+    var s=document.createElement('span');
+    s.textContent='#'+v.replace(/^#/,'');
+    s.style.cssText='display:inline-block;margin-right:6px;margin-bottom:6px;padding:3px 10px;border-radius:14px;background:rgba(204,93,53,0.12);color:#cc5d35;font-size:12px;cursor:pointer';
+    s.onclick=function(){s.remove()};
+    t.parentElement.insertBefore(s,t);
+    t.value='';
+  }
+});
+</script>
+<!--aurasci-bug-fix-milestone--><script>
+document.addEventListener('click',function(e){
+  var b=e.target.closest('button, a, [role=button]');
+  if(!b)return;
+  if(!/Add another milestone/i.test(b.textContent||''))return;
+  e.preventDefault();
+  var existing=document.querySelectorAll('[data-milestone]');
+  var i=existing.length+1;
+  if(i>5){alert('Max 5 milestones');return}
+  var template=existing[0];
+  if(!template)return;
+  var c=template.cloneNode(true);
+  c.setAttribute('data-milestone',String(i));
+  c.querySelectorAll('input, textarea').forEach(function(el){
+    if(el.tagName==='INPUT'&&el.type!=='checkbox')el.value='';
+    if(el.tagName==='TEXTAREA')el.value='';
+  });
+  var label=c.querySelector('.m-label, [data-m-label]');
+  if(label)label.textContent='M'+i;
+  template.parentNode.insertBefore(c,b);
+});
+</script>
+<!--aurasci-bug-fix-inscribing--><script>
+(function(){try{
+  var ticker=localStorage.getItem('aurasci.intent.ticker')||'$DEMO-01';
+  var ttl=localStorage.getItem('aurasci.intent.title')||'';
+  document.querySelectorAll('.ticker,[data-ticker]').forEach(function(el){
+    if(/\$[A-Z]+-\d+/.test(el.textContent))el.textContent=ticker;
+  });
+  document.querySelectorAll('h1, .intent-title, [data-intent-title]').forEach(function(el){
+    if(ttl && /Inscribing/.test(el.textContent))el.textContent='Inscribing '+ticker+' on Setu';
+  });
+}catch(e){}})();
+</script>
+</body>
+</html>

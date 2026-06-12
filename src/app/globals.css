@@ -1,0 +1,241 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #1f2937;
+  --accent-orange: #f97316;
+  --accent-warm: #fb923c;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --aura-glow: rgba(249, 115, 22, 0.12);
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Warm gradient background */
+.hero-gradient {
+  background: radial-gradient(ellipse at 20% 50%, rgba(249, 115, 22, 0.04) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 50%, rgba(251, 146, 60, 0.03) 0%, transparent 50%),
+              radial-gradient(ellipse at 50% 0%, rgba(254, 215, 170, 0.02) 0%, transparent 50%);
+}
+
+/* Subtle grid pattern */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(249, 115, 22, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249, 115, 22, 0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* === AI Sentinel Modal Animations === */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-scan {
+  animation: scan 2s linear infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* === Boost Particle Animation === */
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-80px) scale(1.5);
+  }
+}
+
+.animate-float-up {
+  animation: floatUp 1s ease-out forwards;
+}
+
+/* === Warm Aura Card === */
+.sci-fi-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.sci-fi-card:hover {
+  border-color: rgba(249, 115, 22, 0.3);
+  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.12);
+}
+
+/* Warm glow text */
+.neon-green-text {
+  color: #10b981;
+  text-shadow: none;
+}
+
+.neon-blue-text {
+  color: #f97316;
+  text-shadow: none;
+}
+
+/* Card hover with warm aura */
+.card-glow-green:hover {
+  box-shadow: 0 8px 30px rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.card-glow-purple:hover {
+  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Subtle pulse for shield icon */
+@keyframes shield-pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+
+.shield-pulse {
+  animation: shield-pulse 3s ease-in-out infinite;
+}
+
+/* Warm halo ring for patron avatar */
+.halo-ring {
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.4), 0 0 12px rgba(249, 115, 22, 0.2);
+}
+
+/* Green Shield verified badge */
+.green-shield {
+  color: #10b981;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.3));
+}
+
+/* AI Score ring */
+@keyframes score-fill {
+  from { stroke-dashoffset: 314; }
+}
+
+.score-ring-bg {
+  stroke: #f3f4f6;
+}
+
+.score-ring-fill {
+  stroke: #f97316;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.3));
+  transition: stroke-dashoffset 1s ease-out;
+}
+
+/* Timeline connector */
+.timeline-dot {
+  position: relative;
+}
+
+.timeline-dot.active::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(249, 115, 22, 0.3);
+  animation: timeline-pulse 2s ease-in-out infinite;
+}
+
+@keyframes timeline-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.2); }
+}
+
+/* Tag styles with warm colors */
+.tag-green {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.tag-blue {
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #ea580c;
+}
+
+.tag-purple {
+  background: rgba(251, 146, 60, 0.1);
+  border: 1px solid rgba(251, 146, 60, 0.2);
+  color: #f97316;
+}
+
+/* Clean activity feed (no CRT effect) */
+.crt-scanlines {
+  position: relative;
+}
+
+/* Warm glow border */
+.crt-glow {
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.08);
+}
+
+/* Flash animation for new entries */
+@keyframes flash-in {
+  0% { background-color: rgba(249, 115, 22, 0.08); }
+  100% { background-color: transparent; }
+}
+
+.animate-flash {
+  animation: flash-in 1.5s ease-out;
+}
+
+/* Clean scrollbar */
+.font-mono::-webkit-scrollbar {
+  width: 4px;
+}
+.font-mono::-webkit-scrollbar-track {
+  background: #f9fafb;
+}
+.font-mono::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.2);
+  border-radius: 2px;
+}
+
+/* Warm aura shadow utility */
+.aura-shadow {
+  box-shadow: 0 8px 30px rgba(249, 115, 22, 0.12);
+}
+
+.aura-shadow-lg {
+  box-shadow: 0 12px 40px rgba(249, 115, 22, 0.15);
+}

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AuraSci — Scientist Onboarding</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="bust-theme.css?v=3" />
+<style>
+.pg-head{margin-bottom:30px}
+.pg-head .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);letter-spacing:.18em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.pg-head .eyebrow::before{content:'';width:18px;height:1px;background:var(--rust)}
+.pg-head h1{font-family:'Newsreader',serif;font-weight:500;font-size:clamp(2rem,3.6vw,2.8rem);color:var(--ink);margin:0 0 10px;letter-spacing:-0.01em;line-height:1.05}
+.pg-head h1 em{font-style:italic;color:var(--rust)}
+.pg-head p{font-size:15px;color:var(--ink-3);margin:0;max-width:560px;line-height:1.6}
+
+.stepper{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:32px}
+.step-num{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;background:#fdfcf8;color:var(--mute);border:1px solid var(--line);transition:all .25s}
+.step-num.active{background:var(--rust);color:#faf3e3;border-color:var(--rust);box-shadow:0 0 0 4px rgba(194,65,12,0.12)}
+.step-num.done{background:#65a30d;color:#faf3e3;border-color:#65a30d}
+.step-line{width:80px;height:1px;background:rgba(58,36,24,0.2);transition:all .25s}
+.step-line.done{background:#65a30d}
+.step-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.12em;text-transform:uppercase;margin-left:2px}
+.step-label.active{color:var(--rust)}
+
+.form-card{padding:30px;border-radius:6px;border:1px solid var(--line);background:#fdfcf8;position:relative}
+.form-card::before,.form-card::after{content:'';position:absolute;width:16px;height:16px;border:1.5px solid var(--rust);opacity:.5}
+.form-card::before{top:-1px;left:-1px;border-right:none;border-bottom:none}
+.form-card::after{bottom:-1px;right:-1px;border-left:none;border-top:none}
+.form-card h2{font-family:'Newsreader',serif;font-weight:500;font-size:22px;color:var(--ink);margin:0 0 6px;display:flex;align-items:center;gap:10px;letter-spacing:-0.01em}
+.form-card .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);margin:0 0 24px;letter-spacing:.08em;text-transform:uppercase}
+
+.pane{display:none}
+.pane.active{display:block}
+
+label{display:block;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--mute);margin-bottom:8px;letter-spacing:.12em;text-transform:uppercase}
+label .icon{display:inline-flex;vertical-align:-3px;margin-right:6px;color:var(--rust)}
+.field{margin-bottom:20px}
+.input{width:100%;padding:13px 14px;border-radius:6px;border:1px solid var(--line);background:#faf3e3;font-family:'Inter',sans-serif;font-size:14px;color:var(--ink);transition:all .2s;box-sizing:border-box}
+.input:focus{outline:none;border-color:var(--rust);background:#fffaee;box-shadow:0 0 0 3px rgba(194,65,12,0.10)}
+textarea.input{resize:none;min-height:130px;line-height:1.6;font-family:inherit}
+.word-count{color:var(--mute);font-size:11px;margin-left:6px;text-transform:none;letter-spacing:0;font-weight:400}
+
+.subhead{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust);letter-spacing:.14em;text-transform:uppercase;margin:6px 0 14px;display:flex;align-items:center;gap:10px}
+.subhead::before{content:'';width:14px;height:1px;background:var(--rust)}
+
+.oauth-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+@media (max-width:600px){.oauth-grid{grid-template-columns:1fr}}
+.oauth-btn{text-align:left;padding:18px;border-radius:6px;border:1px solid var(--line);background:#faf3e3;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;font-family:inherit;position:relative}
+.oauth-btn:hover{border-color:var(--rust);background:rgba(254,215,170,0.30)}
+.oauth-btn.connected{border-color:#65a30d;background:rgba(101,163,13,0.06)}
+.oauth-icon{width:42px;height:42px;border-radius:8px;background:rgba(254,215,170,0.40);display:flex;align-items:center;justify-content:center;color:var(--rust);flex-shrink:0}
+.oauth-btn.connected .oauth-icon{background:rgba(101,163,13,0.15);color:#4d7c0f}
+.oauth-meta .a{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.oauth-meta .b{font-size:12px;color:var(--mute);font-family:'JetBrains Mono',monospace}
+.oauth-btn .ok{position:absolute;top:12px;right:12px;display:none;color:#65a30d}
+.oauth-btn.connected .ok{display:block}
+
+.connected-handle{margin-top:18px;padding:12px 14px;border-radius:6px;background:rgba(101,163,13,0.08);border:1px solid rgba(101,163,13,0.35);font-family:'JetBrains Mono',monospace;font-size:12px;color:#4d7c0f;font-weight:500;display:none;align-items:center;gap:8px;letter-spacing:0;text-transform:none}
+.connected-handle::before{content:'';width:7px;height:7px;border-radius:50%;background:#65a30d;box-shadow:0 0 0 3px rgba(101,163,13,0.2)}
+.connected-handle.show{display:flex}
+
+.profile-block{margin-top:30px;padding-top:26px;border-top:1px dashed rgba(58,36,24,0.18);opacity:0;max-height:0;overflow:hidden;transition:opacity .3s ease,max-height .4s ease}
+.profile-block.show{opacity:1;max-height:1400px}
+
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:600px){.review-grid{grid-template-columns:1fr}}
+.review-cell{padding:14px;border-radius:6px;background:#faf3e3;border:1px solid var(--line)}
+.review-cell .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.review-cell .v{font-family:'Newsreader',serif;font-size:17px;color:var(--ink);line-height:1.4}
+
+.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.status-grid .cell{padding:14px;border-radius:6px;background:#faf3e3;border:1px solid var(--line)}
+.status-grid .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.status-grid .v{font-family:'Newsreader',serif;font-size:18px;color:var(--ink)}
+
+.form-foot{margin-top:32px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-back{padding:13px 22px;border-radius:6px;background:transparent;border:1px solid var(--line);color:var(--ink-2);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-back:hover{border-color:var(--rust);color:var(--rust)}
+.btn-next{padding:13px 26px;border-radius:6px;background:var(--ink);border:none;color:#faf3e3;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.btn-next:hover{background:var(--rust)}
+.btn-next[disabled]{opacity:.4;cursor:not-allowed}
+.btn-next[disabled]:hover{background:var(--ink)}
+
+.helper-note{margin-top:16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute);text-align:center;letter-spacing:.05em}
+</style>
+</head>
+<body>
+
+<div class="bportrait-bg"></div>
+
+<nav class="bnav">
+  <div class="left">
+    <a class="brand" href="index.html"><img class="brand-mark" src="logo-mark.png" alt="" /><span>AuraSci</span></a>
+  </div>
+  <div class="links">
+    <a href="market.html">Market</a>
+    <a href="dashboard-patron.html">Portfolio</a>
+    <span class="muted">Governance</span>
+    <a href="leaderboard.html">Leaderboard</a>
+  </div>
+</nav>
+
+<section class="bpage">
+  <div class="bpage-inner fade-in" style="max-width:780px">
+    <div class="pg-head">
+      <div class="eyebrow">Onboarding · Scientist</div>
+      <h1>Establish your <em>research identity.</em></h1>
+      <p>Connect your scholarly footprint and create the Lab Profile that every patron will read.</p>
+    </div>
+
+    <div class="stepper">
+      <div class="step-num active" data-num="1">1</div>
+      <span class="step-label active" data-label="1">Profile</span>
+      <div class="step-line" data-line="1-2"></div>
+      <div class="step-num" data-num="2">2</div>
+      <span class="step-label" data-label="2">Review</span>
+    </div>
+
+    <div class="form-card">
+
+      <!-- ============ STEP 1: IDENTITY + PROFILE ============ -->
+      <div class="pane active" data-pane="1">
+        <div class="sub">Step 01 · Identity & profile</div>
+        <h2>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Connect & complete profile
+        </h2>
+        <p style="font-size:14px;color:var(--ink-3);margin:0 0 22px;line-height:1.6">Connect either GitHub or ORCID to verify authorship, then fill out your lab profile.</p>
+
+        <div class="subhead">A · Connect identity</div>
+
+        <div class="oauth-grid">
+          <button class="oauth-btn" data-connect="github">
+            <div class="oauth-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            </div>
+            <div class="oauth-meta">
+              <div class="a">GitHub</div>
+              <div class="b">click to connect (demo)</div>
+            </div>
+            <span class="ok"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          </button>
+          <button class="oauth-btn" data-connect="orcid">
+            <div class="oauth-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+            </div>
+            <div class="oauth-meta">
+              <div class="a">ORCID</div>
+              <div class="b">click to connect (demo)</div>
+            </div>
+            <span class="ok"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          </button>
+        </div>
+        <div class="connected-handle" id="conn-handle">Connected · @dr_alice_smith · ORCID 0000-0002-1825-0097</div>
+
+        <div class="profile-block" id="profile-block">
+          <div class="subhead">B · Lab profile</div>
+
+          <div class="field">
+            <label><span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Full name</label>
+            <input class="input" id="f-name" type="text" placeholder="Dr. Alice Smith" value="" />
+          </div>
+
+          <div class="field">
+            <label><span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>Email</label>
+            <input class="input" id="f-email" type="email" placeholder="alice@stanford.edu" value="" />
+          </div>
+
+          <div class="field">
+            <label><span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/></svg></span>Affiliation</label>
+            <input class="input" id="f-aff" type="text" placeholder="Stanford University · Bioengineering" value="" />
+          </div>
+
+          <div class="field">
+            <label>Research bio <span class="word-count" id="wc">(48/200 words)</span></label>
+            <textarea class="input" id="f-bio" placeholder="Computational biologist focusing on cellular senescence and tissue regeneration. Currently leading a Stanford lab on small-molecule senolytics with applications in cardiac fibrosis and aging. Open-science advocate; ORCID-verified publications spanning Cell, Nature Aging, and bioRxiv preprints."></textarea>
+          </div>
+        </div>
+
+        <div class="form-foot">
+          <a class="btn-back" href="index.html">← Cancel</a>
+          <button class="btn-next" id="submit-btn" disabled>Submit for review <span style="font-family:'JetBrains Mono',monospace">↗</span></button>
+        </div>
+      </div>
+
+      <!-- ============ STEP 2: REVIEW ============ -->
+      <div class="pane" data-pane="2">
+        <div class="sub">Step 02 · Review</div>
+        <h2>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Awaiting AuraSci Council review
+        </h2>
+        <p style="font-size:14px;color:var(--ink-3);line-height:1.7;margin:8px 0 22px">Your profile and identity have been submitted to the AuraSci Council. Council members verify research authenticity, ORCID alignment, and prior open-science contributions.</p>
+
+        <div class="review-grid">
+          <div class="review-cell">
+            <div class="k">ORCID iD</div>
+            <div class="v" id="r-orcid" style="font-family:'JetBrains Mono',monospace;font-weight:600">0000-0002-1825-0097</div>
+          </div>
+          <div class="review-cell">
+            <div class="k">Affiliation</div>
+            <div class="v" id="r-aff">Stanford · Bioengineering</div>
+          </div>
+        </div>
+
+        <div class="status-grid">
+          <div class="cell">
+            <div class="k">Status</div>
+            <div class="v">Under review</div>
+          </div>
+          <div class="cell">
+            <div class="k">Decision by</div>
+            <div class="v">≤ 48 h</div>
+          </div>
+          <div class="cell">
+            <div class="k">Reviewers</div>
+            <div class="v">5 AuraSci councilors</div>
+          </div>
+        </div>
+
+        <div class="form-foot">
+          <button class="btn-back" data-go="1">← Edit profile</button>
+          <a class="btn-next" href="dashboard-scientist.html">Open scientist dashboard <span style="font-family:'JetBrains Mono',monospace">↗</span></a>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="helper-note">Profile reviewed by the AuraSci Council within 48 h · Handles linked via ORCID</div>
+  </div>
+</section>
+
+<div class="bcorner-bl">
+  <div class="bars"><span></span><span></span><span></span><span></span><span></span></div>
+  <div id="bl-meta">Onboarding · 01/02<br/>Identity pending</div>
+</div>
+<div class="bcorner-br" id="br-status">
+  <span class="blink"></span>Status · <b id="br-stat">awaiting connect</b><br/><b id="br-handle">—</b>
+</div>
+
+<script src="auth-stub.js?v=5"></script>
+<script src="coming-soon.js?v=3"></script>
+<script>
+(function(){
+  function setStep(n){
+    document.querySelectorAll('[data-pane]').forEach(function(p){
+      p.classList.toggle('active', +p.dataset.pane === n);
+    });
+    document.querySelectorAll('.step-num').forEach(function(d){
+      var k = +d.dataset.num;
+      d.classList.toggle('done', k < n);
+      d.classList.toggle('active', k === n);
+    });
+    document.querySelectorAll('.step-label').forEach(function(l){
+      l.classList.toggle('active', +l.dataset.label === n);
+    });
+    document.querySelectorAll('.step-line').forEach(function(l){
+      var from = +l.dataset.line.split('-')[0];
+      l.classList.toggle('done', from < n);
+    });
+    document.getElementById('bl-meta').innerHTML =
+      'Onboarding · ' + String(n).padStart(2,'0') + '/02<br/>' +
+      (n === 1 ? 'Identity pending' : 'Awaiting council');
+    var aff = document.getElementById('f-aff').value || '';
+    document.getElementById('r-aff').textContent = aff || 'Stanford · Bioengineering';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  // OAuth → mark connected, reveal profile section, enable submit
+  document.querySelectorAll('[data-connect]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      btn.classList.add('connected');
+      document.getElementById('conn-handle').classList.add('show');
+      document.getElementById('profile-block').classList.add('show');
+      document.getElementById('submit-btn').disabled = false;
+      document.getElementById('br-stat').textContent = 'authenticated';
+      document.getElementById('br-handle').textContent = '@dr_alice_smith via ' + btn.dataset.connect.toUpperCase();
+    });
+  });
+
+  // Submit → step 2
+  document.getElementById('submit-btn').addEventListener('click', function(){
+    if (this.disabled) return;
+    // Mark the user as a registered scientist so the Portfolio page can
+    // surface the scientist profile + intents instead of the empty state.
+    try { localStorage.setItem('aurasci_scientist_registered', '1'); } catch(_){}
+    setStep(2);
+  });
+
+  // Generic step nav
+  document.querySelectorAll('[data-go]').forEach(function(b){
+    b.addEventListener('click', function(){ setStep(+b.dataset.go); });
+  });
+
+  // word counter
+  var bio = document.getElementById('f-bio');
+  var wc  = document.getElementById('wc');
+  function tick(){
+    var n = (bio.value.trim().match(/\S+/g) || []).length;
+    wc.textContent = '(' + n + '/200 words)';
+  }
+  bio.addEventListener('input', tick); tick();
+
+  console.log('[onboarding-scientist] v5 loaded · 2-step flow');
+})();
+</script>
+<script src="/solana-integration.js?v=13" defer></script>
+</body>
+</html>

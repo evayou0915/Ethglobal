@@ -1,0 +1,362 @@
+// AuraSci — Postgres schema
+// See docs/BASE_MIGRATION.md §2 for the design principle:
+//   the contract is a vault, the DB is the ledger.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── enums ──────────────────────────────────────────────────────────────
+
+enum UserRole {
+  scientist
+  patron
+  admin
+}
+
+enum IntentStatus {
+  draft         // scientist is still editing
+  submitted     // submitted to AI gatekeeper queue
+  ai_screening  // gatekeeper job in flight
+  published     // approved by gatekeeper, accepting deposits
+  funded        // hit funding goal (off-chain check vs on-chain balance)
+  completed     // all 3 milestones released
+  rejected      // gatekeeper rejected OR milestone failed beyond recovery
+}
+
+enum MilestoneStatus {
+  locked            // earlier milestone not yet released
+  in_progress       // current milestone, awaiting scientist proof
+  proof_submitted   // proof uploaded, awaiting AI verifier
+  ai_verifying      // verifier job in flight
+  released          // signature issued + on-chain Released event observed
+  rejected          // AI verifier failed; refund window opens
+}
+
+enum AiJobType {
+  gatekeeper
+  verifier
+}
+
+enum AiJobStatus {
+  queued
+  running
+  succeeded
+  failed
+}
+
+enum ActivityKind {
+  intent_published
+  deposited
+  proof_submitted
+  milestone_verified
+  refunded
+}
+
+// ─── identity ───────────────────────────────────────────────────────────
+
+model User {
+  wallet      String   @id @db.VarChar(42)        // lowercased 0x address — proven via SIWE signature at login
+  role        UserRole
+  email       String?  @db.VarChar(200)           // optional contact email (not collected by the login flow)
+  displayName String?  @db.VarChar(80)            // optional human-readable handle
+  createdAt   DateTime @default(now())
+  lastLoginAt DateTime?
+
+  scientist   Scientist?
+  sessions    Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  wallet    String   @db.VarChar(42)
+  user      User     @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+
+  @@index([wallet])
+}
+
+model Scientist {
+  wallet              String   @id @db.VarChar(42)
+  user                User     @relation(fields: [wallet], references: [wallet], onDelete: Cascade)
+  displayName         String   @db.VarChar(80)
+  bio                 String?  @db.Text
+  avatarUrl           String?  @db.VarChar(500)
+  orcid               String?  @db.VarChar(20)
+  orcidVerified       Boolean  @default(false)
+  githubHandle        String?  @db.VarChar(40)    // optional public GitHub handle shown on the profile
+  affiliation         String?  @db.VarChar(200)
+  intentsPublished    Int      @default(0)        // derived counter, refreshed by indexer
+  milestonesVerified  Int      @default(0)
+  reputation          Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  intents             Intent[]
+}
+
+// ─── core domain ────────────────────────────────────────────────────────
+
+model Intent {
+  // intentId is the bytes32 used on-chain. We store as 0x-prefixed hex string
+  // so it doubles as the primary key and the contract argument.
+  intentId               String       @id @db.VarChar(66)
+  scientistWallet        String       @db.VarChar(42)
+  scientist              Scientist    @relation(fields: [scientistWallet], references: [wallet])
+
+  ticker                 String       @db.VarChar(16)      // "$CELL-01"
+  title                  String       @db.VarChar(200)
+  descriptionMd          String       @db.Text
+  category               String       @db.VarChar(50)      // "Bio", "Neuro", ...
+  tags                   String[]                            // ["ALS", "stem cells"]
+  coverImageUrl          String?      @db.VarChar(500)
+
+  fundingGoalUsdc        BigInt                              // 6-decimal units
+  status                 IntentStatus @default(draft)
+
+  aiGatekeeperScore      Int?         // 0..100
+  aiGatekeeperRationale  String?      @db.Text
+
+  // Indexer-mirrored fields (source of truth: chain events).
+  // Kept here for fast list/search; reconciled against on-chain balanceOf.
+  totalRaisedUsdc        BigInt       @default(0)
+  totalReleasedUsdc      BigInt       @default(0)
+  publishTxHash          String?      @db.VarChar(66)
+  publishedAt            DateTime?
+
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  milestones             Milestone[]
+  patronages             Patronage[]
+  releases               Release[]
+  refunds                RefundRecord[]
+  aiJobs                 AiJob[]
+  auraSpends             AuraSpend[]
+  auraYields             AuraYield[]
+
+  @@index([scientistWallet])
+  @@index([status])
+  @@index([category])
+}
+
+model Milestone {
+  id                  String          @id @default(cuid())
+  intentId            String          @db.VarChar(66)
+  intent              Intent          @relation(fields: [intentId], references: [intentId], onDelete: Cascade)
+  idx                 Int             // 0, 1, 2
+
+  title               String          @db.VarChar(200)
+  descriptionMd       String          @db.Text
+  releaseAmountUsdc   BigInt
+  dueDate             DateTime?
+
+  status              MilestoneStatus @default(locked)
+
+  proofCid            String?         @db.VarChar(80)    // IPFS CID v0/v1
+  proofHash           String?         @db.VarChar(66)    // 0x + SHA-256
+  proofFileName       String?         @db.VarChar(255)
+  proofFileMime       String?         @db.VarChar(100)
+  proofUploadedAt     DateTime?
+
+  aiScore             Int?
+  aiRationale         String?         @db.Text
+
+  releaseSignature    String?         @db.VarChar(132)   // 0x + 65 bytes
+  releaseNonce        String?         @db.VarChar(66)    // bytes32 used on-chain
+  releaseTxHash       String?         @db.VarChar(66)
+  verifiedAt          DateTime?
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  releases            Release[]
+  aiJobs              AiJob[]
+
+  @@unique([intentId, idx])
+}
+
+model Patronage {
+  id              String   @id @default(cuid())
+  intentId        String   @db.VarChar(66)
+  intent          Intent   @relation(fields: [intentId], references: [intentId])
+  patronWallet    String   @db.VarChar(42)
+  amountUsdc      BigInt
+  txHash          String   @db.VarChar(66)
+  blockNumber     BigInt
+  createdAt       DateTime @default(now())
+
+  refundedAmount  BigInt   @default(0)
+  refundTxHash   String?   @db.VarChar(66)
+  refundedAt     DateTime?
+
+  @@index([intentId])
+  @@index([patronWallet])
+  @@unique([txHash])
+}
+
+model Release {
+  id              String    @id @default(cuid())
+  intentId        String    @db.VarChar(66)
+  intent          Intent    @relation(fields: [intentId], references: [intentId])
+  milestoneId     String
+  milestone       Milestone @relation(fields: [milestoneId], references: [id])
+  to              String    @db.VarChar(42)
+  amountUsdc      BigInt
+  nonce           String    @db.VarChar(66)
+  reason          String    @db.VarChar(66)
+  txHash          String    @db.VarChar(66)
+  blockNumber     BigInt
+  createdAt       DateTime  @default(now())
+
+  @@unique([txHash])
+  @@unique([nonce])
+}
+
+model RefundRecord {
+  id              String    @id @default(cuid())
+  intentId        String    @db.VarChar(66)
+  intent          Intent    @relation(fields: [intentId], references: [intentId])
+  patronWallet    String    @db.VarChar(42)
+  amountUsdc      BigInt
+  nonce           String    @db.VarChar(66)
+  reason          String    @db.VarChar(66)
+  txHash          String    @db.VarChar(66)
+  blockNumber     BigInt
+  createdAt       DateTime  @default(now())
+
+  @@unique([txHash])
+  @@unique([nonce])
+}
+
+// ─── operational ────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id             BigInt        @id @default(autoincrement())
+  kind           ActivityKind
+  intentId       String?       @db.VarChar(66)
+  actorWallet    String?       @db.VarChar(42)
+  amountUsdc     BigInt?
+  milestoneIdx   Int?
+  txHash         String?       @db.VarChar(66)
+  blockNumber    BigInt?
+  payload        Json?         // extra event-specific fields
+  createdAt      DateTime      @default(now())
+
+  @@index([intentId])
+  @@index([actorWallet])
+  @@index([createdAt])
+}
+
+model AiJob {
+  id            String      @id @default(cuid())
+  type          AiJobType
+  status        AiJobStatus @default(queued)
+  intentId      String?     @db.VarChar(66)
+  intent        Intent?     @relation(fields: [intentId], references: [intentId])
+  milestoneId   String?
+  milestone     Milestone?  @relation(fields: [milestoneId], references: [id])
+
+  inputCid      String?     @db.VarChar(80)
+  score         Int?
+  rationale     String?     @db.Text
+  // Per-agent breakdown for gatekeeper jobs (5-agent quorum). Shape matches
+  // backend/src/lib/ai.ts → AgentVerdict[]. Verifier jobs leave this null.
+  agentVerdicts Json?
+  // For verifier jobs that pass, the produced EIP-712 release signature.
+  signature     String?     @db.VarChar(132)
+  nonce         String?     @db.VarChar(66)
+
+  error         String?     @db.Text
+  attempts      Int         @default(0)
+  createdAt     DateTime    @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  @@index([status])
+  @@index([intentId])
+}
+
+/// Nonce tracking at the API layer. The contract also tracks usedNonce, but
+/// this lets us reject duplicate sign requests *before* they reach the chain.
+model SignedNonce {
+  nonce        String   @id @db.VarChar(66)
+  purpose      String   @db.VarChar(20)  // "release" | "refund"
+  intentId     String   @db.VarChar(66)
+  amountUsdc   BigInt
+  recipient    String   @db.VarChar(42)
+  signature    String   @db.VarChar(132)
+  consumed     Boolean  @default(false)
+  consumedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([intentId])
+}
+
+/// Indexer checkpoint so the worker resumes after restart.
+model IndexerCheckpoint {
+  id           Int      @id @default(1)
+  lastBlock    BigInt
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Aura social-points system ──────────────────────────────────────────
+//
+// Aura is a season-scoped reputation ledger orthogonal to the USDC escrow.
+// Patrons spend Aura to "boost" an intent's visibility (Aura heat); they
+// also receive Aura yield when intents they supported clear milestones.
+// Aura never converts to money — it's pure social signal.
+
+model AuraSeason {
+  id              String   @id @default(cuid())
+  name            String   @unique @db.VarChar(40)   // e.g. "season-001"
+  startsAt        DateTime
+  endsAt          DateTime
+  budgetPerPatron Int      @default(100)             // baseline per-wallet allowance
+  yieldPerMilestone Int    @default(20)              // pool size split pro-rata per release
+  active          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  spends          AuraSpend[]
+  yields          AuraYield[]
+
+  @@index([active])
+}
+
+model AuraSpend {
+  id        String     @id @default(cuid())
+  wallet    String     @db.VarChar(42)
+  intentId  String     @db.VarChar(66)
+  intent    Intent     @relation(fields: [intentId], references: [intentId], onDelete: Cascade)
+  seasonId  String
+  season    AuraSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  amount    Int                                       // > 0
+  createdAt DateTime   @default(now())
+
+  @@index([wallet, seasonId])
+  @@index([intentId, seasonId])
+}
+
+model AuraYield {
+  id           String     @id @default(cuid())
+  wallet       String     @db.VarChar(42)
+  intentId     String?    @db.VarChar(66)
+  intent       Intent?    @relation(fields: [intentId], references: [intentId], onDelete: SetNull)
+  seasonId     String
+  season       AuraSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  amount       Int                                    // > 0
+  source       String     @db.VarChar(30)             // "milestone_released" | "admin_grant"
+  milestoneIdx Int?
+  txHash       String?    @db.VarChar(66)             // unique key to dedupe per release event
+  createdAt    DateTime   @default(now())
+
+  @@unique([wallet, source, txHash])
+  @@index([wallet, seasonId])
+}

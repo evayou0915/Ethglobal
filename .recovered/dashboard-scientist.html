@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AuraSci — Scientist Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="bust-theme.css?v=3" />
+<style>
+  .pg-head{margin-bottom:32px}
+  .pg-head h1{font-family:'Newsreader',serif;font-weight:500;font-size:clamp(2rem,3.6vw,2.8rem);color:var(--ink);margin:0 0 10px;letter-spacing:-0.01em}
+  .pg-head h1 em{font-style:italic;color:var(--rust)}
+  .pg-head p{font-size:15px;color:var(--ink-3);margin:0;max-width:620px;line-height:1.6}
+
+  .status-banner{margin-bottom:32px;padding:16px 20px;display:flex;align-items:center;gap:14px;border:1px solid rgba(194,65,12,0.3);background:rgba(254,215,170,0.30);border-radius:6px}
+  .status-banner svg{flex-shrink:0;color:var(--rust)}
+  .status-banner .a{font-family:'Newsreader',serif;font-weight:500;font-size:17px;color:var(--ink);letter-spacing:-0.005em}
+  .status-banner .b{font-size:13px;color:var(--ink-3);margin-top:2px;line-height:1.5}
+
+  .profile-card{background:#fdfcf8;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .profile-head{padding:24px;border-bottom:1px solid var(--line-soft)}
+  .ph-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .ph-left{display:flex;align-items:center;gap:16px}
+  .avatar-lg{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#fed7aa,#fb923c);border:1px solid rgba(194,65,12,0.3);display:flex;align-items:center;justify-content:center;color:#7c2d12}
+  .ph-name{font-family:'Newsreader',serif;font-weight:500;font-size:24px;color:var(--ink);margin:0;letter-spacing:-0.01em}
+  .ph-handle{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mute);margin-top:2px}
+
+  .profile-body{padding:24px;display:flex;flex-direction:column;gap:18px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:600px){.info-grid{grid-template-columns:1fr}}
+  .info-cell{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:6px;background:#faf3e3;border:1px solid var(--line-soft)}
+  .info-cell svg{color:var(--mute);flex-shrink:0}
+  .info-cell .l{font-size:12px;color:var(--mute);margin-bottom:2px}
+  .info-cell .v{font-size:14px;color:var(--ink-2);font-weight:500}
+  .span-2{grid-column:span 2}
+  @media (max-width:600px){.span-2{grid-column:span 1}}
+  .bio-box{padding:18px 20px;border-radius:6px;background:#faf3e3;border:1px solid var(--line-soft)}
+  .bio-box .l{font-size:12px;color:var(--mute);margin-bottom:8px}
+  .bio-box .v{font-size:14px;color:var(--ink-3);line-height:1.7}
+
+  .actions{margin-top:40px}
+  .actions h3{font-family:'Newsreader',serif;font-weight:500;font-size:24px;color:var(--ink);margin:0 0 16px;letter-spacing:-0.01em}
+  .actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:600px){.actions-grid{grid-template-columns:1fr}}
+  .action-card{padding:20px;border-radius:6px;border:1px solid var(--line);background:#fdfcf8;text-align:left;transition:all .2s;cursor:pointer}
+  .action-card:hover:not(.disabled){border-color:var(--rust);transform:translateY(-1px);box-shadow:0 8px 18px rgba(154,52,18,0.06)}
+  .action-card.disabled{opacity:.55;cursor:not-allowed}
+  .action-card .a{font-family:'Inter',sans-serif;font-weight:600;font-size:15px;color:var(--ink);margin-bottom:4px}
+  .action-card .b{font-size:13px;color:var(--mute)}
+
+  .dev-tools{margin-top:48px;padding:18px;border-radius:6px;border:1px dashed rgba(194,65,12,0.4);background:rgba(254,215,170,0.18)}
+  .dev-tools .head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .dev-tools .head span{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--rust)}
+  .dev-btn{padding:8px 16px;border-radius:6px;background:#fdfcf8;border:1px solid rgba(194,65,12,0.3);color:var(--rust);font-size:13px;font-weight:500;cursor:pointer}
+  .dev-btn:hover{background:rgba(254,215,170,0.30)}
+</style>
+</head>
+<body>
+
+<div class="bportrait-bg"></div>
+
+<nav class="bnav">
+  <div class="left">
+    <a class="brand" href="index.html"><img class="brand-mark" src="logo-mark.png" alt="" /><span>AuraSci</span></a>
+  </div>
+  <div class="links">
+    <a href="market.html">Market</a>
+    <a href="dashboard-patron.html">Portfolio</a>
+    <span class="muted">Governance</span>
+    <a href="leaderboard.html">Leaderboard</a>
+  </div>
+</nav>
+
+<section class="bpage">
+  <div class="bpage-inner fade-in" style="max-width:960px">
+    <div class="pg-head">
+      <h1>Scientist <em>dashboard</em></h1>
+      <p>Manage your Lab Profile and research intents.</p>
+    </div>
+
+    <div class="status-banner" id="status-banner">
+      <svg id="status-banner-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div>
+        <div class="a" id="status-banner-a">Pending review</div>
+        <div class="b" id="status-banner-b">Your profile is being reviewed by the AuraSci team. This usually takes 24–48 hours.</div>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <div class="profile-head">
+        <div class="ph-row">
+          <div class="ph-left">
+            <div class="avatar-lg">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <h2 class="ph-name">Dr. Alice Smith</h2>
+              <p class="ph-handle">@dr_alice_smith</p>
+            </div>
+          </div>
+          <span class="bpill" id="profile-pill" style="color:var(--rust);border-color:rgba(194,65,12,0.4);background:rgba(254,215,170,0.30)">Pending review</span>
+        </div>
+      </div>
+
+      <div class="profile-body">
+        <div class="info-grid">
+          <div class="info-cell">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <div>
+              <div class="l">Email</div>
+              <div class="v">alice@stanford.edu</div>
+            </div>
+          </div>
+          <div class="info-cell">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            <div>
+              <div class="l">Handle</div>
+              <div class="v">@dr_alice_smith</div>
+            </div>
+          </div>
+          <div class="info-cell span-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/></svg>
+            <div>
+              <div class="l">Affiliation</div>
+              <div class="v">Stanford University</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bio-box">
+          <div class="l">Research bio</div>
+          <div class="v">Specializing in cellular senescence and cardiac tissue regeneration. PI at the Reed Lab focusing on translational approaches to reverse age-related fibrosis using novel mRNA delivery systems.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <h3>Actions</h3>
+      <div class="actions-grid">
+        <a class="action-card disabled" id="ac-create" href="javascript:void(0)" style="text-decoration:none">
+          <div class="a">Create intent asset</div>
+          <div class="b" id="ac-create-b">Requires approved profile</div>
+        </a>
+        <button class="action-card disabled">
+          <div class="a">My intent assets</div>
+          <div class="b">Phase 1 — coming soon</div>
+        </button>
+      </div>
+    </div>
+
+    <div class="dev-tools" id="dev-tools-panel">
+      <div class="head">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--rust)"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span>Dev tools</span>
+      </div>
+      <button class="dev-btn" id="dev-approve">[Dev] Mock admin approve</button>
+      <a class="dev-btn" id="dev-publish" href="create-intent.html" style="text-decoration:none;display:none;margin-left:8px">[Dev] Publish test Scientific Intent →</a>
+    </div>
+  </div>
+</section>
+
+<div class="bcorner-bl">
+  <div class="bars"><span></span><span></span><span></span><span></span><span></span></div>
+  <div id="bl-meta">Lab profile / Pending<br/></div>
+</div>
+<div class="bcorner-br" id="br-status">
+  <span class="blink" style="background:#f59e0b"></span>Status · review pending<br/><b>24–48h</b> est. window
+</div>
+
+<script src="auth-stub.js?v=5"></script>
+<script src="coming-soon.js?v=3"></script>
+<script src="/solana-integration.js?v=13" defer></script>
+<script>
+(function(){
+  // Dev shortcut — flip the entire dashboard into the "approved" state so
+  // every status surface stays consistent and the publish flow is testable.
+  var btn = document.getElementById('dev-approve');
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    // Mark scientist as registered + approved so Portfolio (dashboard-patron)
+    // surfaces the registered scientist view.
+    try {
+      localStorage.setItem('aurasci_scientist_registered', '1');
+      localStorage.setItem('aurasci_scientist_approved', '1');
+    } catch(_){}
+    // 1) Top status banner — clock → check, copy + colour shift to green
+    var banner = document.getElementById('status-banner');
+    var bA = document.getElementById('status-banner-a');
+    var bB = document.getElementById('status-banner-b');
+    var bIco = document.getElementById('status-banner-icon');
+    if (banner) {
+      banner.style.borderColor = 'rgba(101,163,13,0.40)';
+      banner.style.background  = 'rgba(101,163,13,0.10)';
+    }
+    if (bIco) {
+      bIco.style.color = '#4d7c0f';
+      bIco.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+    }
+    if (bA) bA.textContent = 'Approved';
+    if (bB) bB.textContent = 'Your profile has been verified by the AuraSci team. You can now publish Scientific Intent assets.';
+
+    // 2) Profile pill: Pending review → Verified (green)
+    var pill = document.getElementById('profile-pill');
+    if (pill) {
+      pill.textContent = 'Verified';
+      pill.style.color = '#4d7c0f';
+      pill.style.borderColor = 'rgba(101,163,13,0.45)';
+      pill.style.background  = 'rgba(101,163,13,0.10)';
+    }
+
+    // 3) Unlock the "Create intent asset" action card
+    var card = document.getElementById('ac-create');
+    var subt = document.getElementById('ac-create-b');
+    if (card) {
+      card.classList.remove('disabled');
+      card.setAttribute('href', 'create-intent.html');
+    }
+    if (subt) subt.textContent = 'Open the 4-step publish flow';
+
+    // 4) Hide the dev-tools panel after use
+    var devPanel = document.getElementById('dev-tools-panel');
+    if (devPanel) devPanel.style.display = 'none';
+
+    // 5) Bottom corner meta + status
+    var bl = document.getElementById('bl-meta');
+    if (bl) bl.innerHTML = 'Lab profile / <b>Approved</b><br/>';
+    var br = document.getElementById('br-status');
+    if (br) br.innerHTML = '<span class="blink" style="background:#65a30d"></span>Status · approved<br/><b>Ready</b> to publish';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Exclude Solana on-chain code from Vercel build (reference code for hackathon judging, not part of demo runtime)
+programs/
+src/solana/
+src/app/api/
+scripts/seed-devnet.ts
+Anchor.toml

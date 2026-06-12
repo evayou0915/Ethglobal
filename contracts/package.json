@@ -1,0 +1,28 @@
+{
+  "name": "aurasci-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AuraSci escrow contracts (Base) — Hardhat workspace, decoupled from the root Next.js app.",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network base_sepolia",
+    "deploy:base": "hardhat run scripts/deploy.ts --network base",
+    "verify:sepolia": "hardhat verify --network base_sepolia",
+    "clean": "hardhat clean"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.5",
+    "chai": "^4.5.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "hardhat": "^2.22.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}
