@@ -152,8 +152,8 @@ from any address other than `/me.wallet`.
 ### 1. Clone + install
 
 ```bash
-git clone https://github.com/Bicabo98/aurasciSL.git
-cd aurasciSL
+git clone https://github.com/evayou0915/Ethglobal.git
+cd Ethglobal
 npm install
 cd backend && npm install && cd ..
 cd contracts && npm install && cd ..
@@ -210,7 +210,7 @@ fund an intent.
 ## 🛠 Repository layout
 
 ```
-aurasciSL/
+Ethglobal/
 ├── src/                          # Next.js frontend
 │   ├── app/(app)/               # App Router pages (market, intent, create, scientist, portfolio, leaderboard, ...)
 │   ├── client/                  # api.ts, hooks.ts, wagmi config
@@ -239,8 +239,7 @@ aurasciSL/
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── BASE_MIGRATION.md        # design rationale + phase log
-│   ├── DEPLOYMENT.md
-│   └── FORK_GUIDE.md
+│   └── DEPLOYMENT.md
 │
 └── public/                       # static demo data + landing assets
 ```
@@ -257,8 +256,7 @@ aurasciSL/
 | Contract | Base Sepolia (testnet) / Base mainnet | See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). |
 
 `backend/ecosystem.config.cjs` is a pm2 config that starts the three Node
-processes (api / indexer / ai-worker) as one unit. See
-[docs/FORK_GUIDE.md](docs/FORK_GUIDE.md) for a step-by-step.
+processes (api / indexer / ai-worker) as one unit.
 
 ---
 
@@ -288,9 +286,8 @@ processes (api / indexer / ai-worker) as one unit. See
 ## 📚 Further reading
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system-level diagram + data flow
-- [docs/BASE_MIGRATION.md](docs/BASE_MIGRATION.md) — why this stack, what changed from the original Solana version
+- [docs/BASE_MIGRATION.md](docs/BASE_MIGRATION.md) — design rationale + phase log
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploy + verify on Base
-- [docs/FORK_GUIDE.md](docs/FORK_GUIDE.md) — clone, point at your own DB/contract, ship in an afternoon
 
 ---
 

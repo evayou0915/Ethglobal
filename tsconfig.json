@@ -26,9 +26,6 @@
   "exclude": [
     "node_modules",
     "contracts/**",
-    "backend/**",
-    "src/solana/**",
-    "src/app/api/ai-verifier/**",
-    "scripts/seed-devnet.ts"
+    "backend/**"
   ]
 }

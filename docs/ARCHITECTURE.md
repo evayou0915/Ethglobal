@@ -1,123 +1,131 @@
 # AuraSci Architecture
 
+> **The smart contract is a vault. The backend is the ledger.**
+> USDC custody and money movement live on-chain; everything else —
+> profiles, intent metadata, milestone state machines, AI scores, proofs,
+> activity, Aura points — lives in Postgres behind a Hono API.
+
 ## System diagram
 
 ```
-                          ┌────────────────────────┐
-                          │      Patrons / DAOs    │
-                          └────────────┬───────────┘
-                                       │ USDC
-                                       ▼
-┌─────────┐   sign      ┌──────────────────────────────┐    sign    ┌──────────────┐
-│ Scientist├────────────▶│   AuraSci Anchor Program     │◀───────────┤ AI Verifier  │
-│ Phantom │  publish_   │   (declare_id! …)            │  verify_   │  (server     │
-└─────────┘  intent     │                              │  milestone │   keypair)   │
-                        │  ┌────────────────────────┐  │            └──────┬───────┘
-                        │  │   IntentAsset PDA      │  │                   │
-                        │  │   Milestone PDA × 3    │  │                   │
-                        │  │   Escrow Vault (USDC)  │  │                   │
-                        │  │   Patronage PDA × N    │  │                   │
-                        │  └────────────────────────┘  │                   │
-                        └──────────────┬───────────────┘                   │
-                                       │ release tranche                   │
-                                       ▼                                   │
-                          ┌────────────────────────┐                       │
-                          │  Scientist USDC ATA    │                       │
-                          └────────────────────────┘                       │
-                                                                           │
-        ┌──────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌──────────────────────────┐         ┌──────────────────────────┐
-│  IPFS / Arweave  (proof  │◀────────│  Next.js /api/ipfs-upload │
-│  PDF / dataset / commit) │         └──────────────────────────┘
-└──────────────────────────┘
+┌──────────────────┐        ┌────────────────────────────────────┐
+│  Next.js front   │  HTTPS │   Hono backend (self-hosted)        │
+│  (Vercel)        │◀──────▶│                                     │
+│  - SIWE auth     │        │  ┌──────────┐  ┌──────────┐         │
+│  - wagmi/viem    │        │  │  /api/*  │  │ ai-worker│         │
+│  - injected w.   │        │  │   Hono   │  │  (LLM    │         │
+└────────┬─────────┘        │  └────┬─────┘  │  jobs)   │         │
+         │ writeContract     │       │        └────┬─────┘         │
+         ▼                   │       ▼             │               │
+┌──────────────────┐         │  ┌─────────────────────────────┐    │
+│ AuraSciEscrow.sol│◀────────┼──│  Postgres  (Prisma client)  │    │
+│ on Base (USDC)   │         │  └─────────────────────────────┘    │
+│ - deposit        │         │                ▲                    │
+│ - release(sig)   │         │  ┌─────────────┴────┐               │
+│ - refund(sig)    │         │  │     indexer      │ ── viem ──┐   │
+│ - adminWithdraw  │         │  │ (event watcher)  │           │   │
+└────────┬─────────┘         │  └──────────────────┘           │   │
+         │ Deposited/        └──────────────────────────────────│──┘
+         │ Released/                                            │
+         │ Refunded                                             │
+         └───────────────────────── Base RPC ───────────────────┘
 ```
 
-## On-chain account hierarchy
+Three long-running Node processes (`backend/ecosystem.config.cjs`):
 
-```
-Scientist  (1 per wallet)
-  └─ IntentAsset  (N per scientist, indexed by intent_id)
-       ├─ Milestone   (exactly 3, indexed 0..2)
-       ├─ Patronage   (M per intent, one per patron wallet)
-       └─ Escrow Vault (1 per intent, USDC ATA owned by program PDA)
-```
+| Process | Entry | Job |
+| --- | --- | --- |
+| `api` | [`backend/src/server.ts`](../backend/src/server.ts) | Hono HTTP API for the frontend |
+| `indexer` | [`backend/src/indexer.ts`](../backend/src/indexer.ts) | `watchContractEvent` → mirrors `Deposited` / `Released` / `Refunded` into Postgres, with a persisted checkpoint |
+| `ai-worker` | [`backend/src/ai-worker.ts`](../backend/src/ai-worker.ts) | Drains the `AiJob` queue: gatekeeper scoring, proof verification, EIP-712 release signing |
 
-PDA seeds — see [`src/solana/lib/pdas.ts`](../src/solana/lib/pdas.ts):
+## Money flow (on-chain)
 
-| PDA | Seeds |
-| --- | --- |
-| Scientist | `["scientist", scientist_wallet]` |
-| IntentAsset | `["intent", scientist_wallet, intent_id_u64_le]` |
-| Milestone | `["milestone", intent_pda, milestone_index_u8]` |
-| Patronage | `["patronage", intent_pda, patron_wallet]` |
-| Escrow Vault | `["escrow", intent_pda]` |
+One contract: [`contracts/src/AuraSciEscrow.sol`](../contracts/src/AuraSciEscrow.sol).
+State is deliberately minimal — `balanceOf[intentId]`, `usedNonce[nonce]`,
+`admin` / `pendingAdmin`. No metadata, no statuses, no scores on-chain.
 
-## Why three milestones, not N
+| Function | Caller | Gate |
+| --- | --- | --- |
+| `deposit(intentId, amount)` | Any patron | USDC `approve` + `transferFrom` |
+| `release(intentId, to, amount, nonce, reason, sig)` | Scientist (via Claim) | EIP-712 sig from the backend verifier key |
+| `refund(intentId, patron, amount, nonce, reason, sig)` | Patron | EIP-712 sig from the backend verifier key |
+| `adminWithdraw(intentId, to, amount, reason)` | Admin only | 100k USDC per-tx cap; two-step admin rotation |
 
-Three is the minimum that gives the contract real proof-of-progress
-information without making the UX a budgeting form. It also matches
-how grant agencies think (M1 = setup, M2 = data, M3 = result).
+Every release/refund consumes a unique `nonce` (anti-replay). The verifier
+key only signs payloads — it never holds funds; the admin key never signs
+routine releases. Compromise of either is survivable (`setSigner`,
+`setPaused`, `transferAdmin` → `acceptAdmin`).
+
+## Off-chain data model
+
+Prisma schema: [`backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
+
+| Group | Models | Notes |
+| --- | --- | --- |
+| Identity | `User`, `Session`, `Scientist` | `User.wallet` is the permanent on-chain identity; SIWE login pins it |
+| Market | `Intent`, `Milestone`, `Patronage` | Intent = proposal + funding goal; exactly 3 milestones each |
+| Money mirror | `Release`, `RefundRecord`, `SignedNonce`, `IndexerCheckpoint` | DB reflection of on-chain events, written by the indexer |
+| AI | `AiJob` | Queue rows: `gatekeeper` and `verifier` job kinds |
+| Social | `AuraSeason`, `AuraSpend`, `AuraYield` | Off-chain reputation: season budgets, boosts, milestone yield |
+| Audit | `ActivityLog` | Feeds the live activity UI |
 
 ## State machines
 
-### IntentStatus
+### Intent
 ```
-Draft → AiScreening → Published → Funded → Completed
-                            │
-                            └─ Rejected (refund path open)
-```
-
-### MilestoneStatus
-```
-Locked → InProgress → ProofSubmitted → AiVerified → Released
-                                    │
-                                    └─ Rejected
+draft → ai_screening → published → funded → completed
+                │
+                └─ rejected (refund path open)
 ```
 
-`publish_intent` initialises milestone 0 to `InProgress` and 1, 2 to
-`Locked`. `verify_milestone` advances the next one to `InProgress` after
-release (this is enforced by the FE today; the simplified hackathon program
-leaves it implicit, see TODO in `lib.rs`).
+### Milestone
+```
+locked → in_progress → proof_submitted → verifying → released
+                                      │
+                                      └─ rejected (per-milestone refund)
+```
 
-## Trust model
+## AI pipeline
 
-| Action | Authorised signer | On-chain check |
-| --- | --- | --- |
-| publish_intent | Scientist wallet | `seeds=["intent", scientist, …]` derives only with that signer |
-| patronize | Patron wallet | SPL `transfer` requires patron's signature |
-| submit_proof | Scientist wallet | `intent.scientist == signer` |
-| verify_milestone | AI Verifier keypair | `signer.key() == AI_VERIFIER_PUBKEY` baked into the program |
-| refund | Patron wallet | seeds + `intent.status == Rejected` |
+**Gatekeeper** (publish time, [`backend/src/lib/ai.ts`](../backend/src/lib/ai.ts)) —
+five agents (ATLAS-7 feasibility, HELIX-3 milestone clarity, ORCHID-9
+budget, VESTA-2 open-science integrity, LYRA-5 risk) score the proposal
+0–100 in parallel. **Pass requires both** ≥3/5 individual approvals **and**
+mean ≥ 70. Fail → intent is `rejected` and hidden from the market.
 
-The AI Verifier pubkey is a constant inside `lib.rs`. Phase 3 swaps this
-for an admin PDA so multiple verifiers (or a multisig) can sign — but for
-the hackathon a single trusted signer keeps the demo legible.
+**Verifier** (per-milestone) — grades the submitted proof artifact and, on
+pass, signs an EIP-712 release payload that is cached on the milestone row
+(`releaseSignature` / `releaseNonce`). The scientist's Claim button
+broadcasts that cached signature, so a cancelled wallet popup resumes
+cleanly without re-grading. Mode is controlled by `AI_VERIFIER_MODE`
+(`approve` | `heuristic` | `llm`).
 
-## Off-chain pieces
+## Auth
 
-| Service | Where | Why off-chain |
-| --- | --- | --- |
-| AI Gatekeeper | `/api/ai-verifier` Next route | LLM inference can't run in BPF |
-| Proof storage | IPFS via Pinata, `/api/ipfs-upload` | 200KB→200MB blobs are not on-chain data |
-| Live event feed | `useOnChainActivity` hook | WebSocket subscription on the client |
-| Demo seed | `scripts/seed-devnet.ts` | One-shot devnet bootstrap |
+Sign-In-With-Ethereum ([`backend/src/routes/auth.ts`](../backend/src/routes/auth.ts)):
+browser wallet signs a one-time server nonce → backend verifies → issues a
+session JWT whose subject is the wallet address. Every API call carries the
+JWT; ownership checks (intent owner, payout target, refund eligibility) all
+compare against `User.wallet`. The frontend refuses to sign transactions
+from any other address ([`src/client/hooks.ts`](../src/client/hooks.ts)).
 
-The browser computes the SHA-256 of any uploaded proof file *before*
-sending it to IPFS — so even if the IPFS gateway disappears, the on-chain
-hash plus a re-uploaded copy of the file is enough to prove the original
-content.
+## Proof artifacts
 
-## Trade-offs we made for the hackathon
+Milestone proofs (PDFs, datasets, images, archives ≤ 50 MB) are uploaded via
+`POST /api/intents/:id/milestones/:idx/submit-proof`
+([`backend/src/routes/proofs.ts`](../backend/src/routes/proofs.ts)). The
+backend computes a SHA-256 of the bytes, stores the file on decentralized
+storage, and records the content id + hash + filename on the `Milestone`
+row. The hash binds what the verifier graded to what was uploaded — even if
+the storage gateway disappears, the hash plus a re-uploaded copy of the
+file proves the original content.
 
-1. **Single AI Verifier signer** — production should be a multisig of
-   independent grading models.
-2. **No staking / slashing** — bad-faith verification has no economic
-   penalty in Phase 2.
-3. **Fixed 3 milestones** — flexible milestone count is a Phase 3 item.
-4. **USDC only** — Phase 3 will route through Jupiter for any SPL token.
-5. **Refund only on `Rejected` status** — production needs deadline-based
-   force-refund.
+## Deployment topology
 
-These are documented as `TODO(phase-3)` markers in the Rust source.
+| Tier | Where |
+| --- | --- |
+| Frontend | Vercel (only `NEXT_PUBLIC_*` env) |
+| Backend api + indexer + ai-worker | Self-hosted Node 20 (pm2, `backend/ecosystem.config.cjs`) |
+| Postgres | Backend host or managed |
+| Contract | Base Sepolia (testnet) / Base mainnet — see [DEPLOYMENT.md](DEPLOYMENT.md) |
