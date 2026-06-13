@@ -34,4 +34,5 @@ next-env.d.ts
 .claude/
 
 LamportID.pem
-.playwright-mcp
+.playwright-mcp.
+.env.production

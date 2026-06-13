@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import Anthropic from "@anthropic-ai/sdk";
 import { ENV } from "./env.js";
 
 export type Scored = { score: number; rationale: string; model: string };
@@ -85,7 +86,16 @@ const GATEKEEPERS = [
 
 const PASS_THRESHOLD = 70;
 
-const hasLLM = () => Boolean(ENV.OPENAI_API_KEY);
+const hasLLM = () => Boolean(ENV.ANTHROPIC_API_KEY);
+
+// Anthropic client — lazily constructed so jobs never instantiate it when
+// the key is absent (approve/heuristic modes). The SDK reads the key we
+// pass explicitly; we never fall back to ambient env.
+let _claude: Anthropic | null = null;
+function claude(): Anthropic {
+  if (!_claude) _claude = new Anthropic({ apiKey: ENV.ANTHROPIC_API_KEY });
+  return _claude;
+}
 
 // ─── Gatekeeper: 5-agent quorum ─────────────────────────────────────────
 
@@ -124,7 +134,7 @@ export async function scoreIntentQuorum(args: {
       score: 50,
       rationale: `Agent call failed: ${(s.reason as Error)?.message ?? "unknown"}`,
       approved: false,
-      model: ENV.OPENAI_MODEL,
+      model: ENV.ANTHROPIC_MODEL,
       errored: true,
     };
   });
@@ -154,7 +164,7 @@ export async function scoreIntentQuorum(args: {
 //
 // `AI_VERIFIER_MODE` selects the behavior:
 //   "llm"       — fetch proof from Walrus + real LLM grading (recommended;
-//                  requires OPENAI_API_KEY).
+//                  requires ANTHROPIC_API_KEY).
 //   "heuristic" — deterministic 60-95 sha256-based score, ~72% pass rate.
 //   "approve"   — always score 99/100. Demo / CI escape hatch: keeps the
 //                  full release flow runnable without an LLM key.
@@ -240,7 +250,7 @@ export async function scoreProof(args: {
         contentExcerpt: excerpt || "(binary content not included)",
       },
     });
-    return callOpenAI(system, payload);
+    return callClaude(system, payload);
   }
   if (VERIFIER_MODE === "heuristic") {
     return heuristicScore("verifier", JSON.stringify(args));
@@ -281,36 +291,28 @@ function parseJsonLoose(raw: string): { score?: number; rationale?: string } {
   throw new Error(`Could not extract JSON from LLM response: ${text.slice(0, 200)}…`);
 }
 
-async function callOpenAI(system: string, payload: string): Promise<Scored> {
-  const url = `${ENV.OPENAI_BASE_URL}/chat/completions`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: ENV.OPENAI_MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: payload },
-      ],
-      // Best-effort hint — official OpenAI honors this; many compat relays
-      // ignore it and return text with markdown fences. parseJsonLoose
-      // copes with both shapes.
-      response_format: { type: "json_object" },
-      temperature: 0,
-    }),
+async function callClaude(system: string, payload: string): Promise<Scored> {
+  // System prompt carries the rubric + "reply ONLY as JSON" instruction; the
+  // payload (intent/proof JSON) is the user turn. Opus 4.x removed
+  // `temperature`, so we steer purely via the prompt. max_tokens is generous
+  // enough that the short JSON verdict never truncates even if the model
+  // prefixes a sentence of reasoning — parseJsonLoose extracts the object.
+  const resp = await claude().messages.create({
+    model: ENV.ANTHROPIC_MODEL,
+    max_tokens: 2048,
+    system,
+    messages: [{ role: "user", content: payload }],
   });
-  if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = body.choices?.[0]?.message?.content ?? "{}";
-  const parsed = parseJsonLoose(content);
+  const content = resp.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+  const parsed = parseJsonLoose(content || "{}");
   const score = Math.max(0, Math.min(100, Math.round(parsed.score ?? 0)));
   return {
     score,
     rationale: parsed.rationale ?? "(no rationale returned)",
-    model: ENV.OPENAI_MODEL,
+    model: ENV.ANTHROPIC_MODEL,
   };
 }
 
@@ -323,12 +325,12 @@ async function callAgent(agent: string, persona: string, system: string, payload
     return {
       agent, persona,
       score,
-      rationale: `Heuristic verdict (no OPENAI_API_KEY set). Set the env var to enable real ${agent} review.`,
+      rationale: `Heuristic verdict (no ANTHROPIC_API_KEY set). Set the env var to enable real ${agent} review.`,
       approved: score >= PASS_THRESHOLD,
       model: "heuristic-v1",
     };
   }
-  const scored = await callOpenAI(system, payload);
+  const scored = await callClaude(system, payload);
   return {
     agent, persona,
     score: scored.score,
@@ -344,8 +346,8 @@ function heuristicScore(kind: "gatekeeper" | "verifier", input: string): Scored 
   return {
     score,
     rationale:
-      `Heuristic ${kind} score (no OPENAI_API_KEY set). Deterministic placeholder; ` +
-      `set OPENAI_API_KEY to enable real LLM grading.`,
+      `Heuristic ${kind} score (no ANTHROPIC_API_KEY set). Deterministic placeholder; ` +
+      `set ANTHROPIC_API_KEY to enable real LLM grading.`,
     model: "heuristic-v1",
   };
 }
@@ -359,5 +361,5 @@ export async function scoreIntent(args: {
   fundingGoalUsdc: bigint;
 }): Promise<Scored> {
   const q = await scoreIntentQuorum(args);
-  return { score: q.score, rationale: q.rationale, model: ENV.OPENAI_MODEL };
+  return { score: q.score, rationale: q.rationale, model: ENV.ANTHROPIC_MODEL };
 }

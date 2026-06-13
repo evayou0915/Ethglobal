@@ -38,12 +38,11 @@ export const ENV = {
   WALRUS_AGGREGATOR_URL: optional("WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space").replace(/\/$/, ""),
   WALRUS_EPOCHS:         Number(optional("WALRUS_EPOCHS", "5")),
 
-  // OpenAI-compatible relay. Any provider that exposes `/v1/chat/completions`
-  // works (LiteLLM, OpenRouter, Anthropic's compat endpoint, your own proxy).
-  // Leave OPENAI_BASE_URL unset to hit api.openai.com.
-  OPENAI_API_KEY:  process.env.OPENAI_API_KEY ?? "",
-  OPENAI_BASE_URL: optional("OPENAI_BASE_URL", "https://api.openai.com/v1").replace(/\/$/, ""),
-  OPENAI_MODEL:    optional("OPENAI_MODEL", "gpt-4o-mini"),
+  // Anthropic API — powers the gatekeeper quorum + proof verifier when
+  // AI_VERIFIER_MODE=llm. Default model is the most capable Opus; set
+  // ANTHROPIC_MODEL=claude-sonnet-4-6 or claude-haiku-4-5 to cut cost.
+  ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
+  ANTHROPIC_MODEL:   optional("ANTHROPIC_MODEL", "claude-haiku-4-5"),
 
   // Canton private rail — JSON Ledger API of the sandbox started by
   // `daml start` in canton/ (default http://localhost:7575). Empty = the

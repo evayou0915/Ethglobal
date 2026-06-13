@@ -4,3 +4,10 @@ src/solana/
 src/app/api/
 scripts/seed-devnet.ts
 Anchor.toml
+
+# Not part of the Next.js frontend build — keep the deploy upload lean
+backend/
+canton/
+contracts/
+docs/
+.recovered/
