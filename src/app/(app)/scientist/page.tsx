@@ -9,6 +9,7 @@ import { useAuth } from "@/client/auth";
 import { useClaim, useIntents, useSession, useSubmitProof } from "@/client/hooks";
 import { useToast } from "@/components/Toast";
 import { txUrl } from "@/wagmi/config";
+import { isWalrusBlobId, walrusBlobUrl } from "@/client/walrus";
 import type { IntentDto, MilestoneDto, ScientistDto } from "@/types/api";
 
 export default function ScientistDashboardPage() {
@@ -417,6 +418,20 @@ function MilestoneRow({
               </span>
             </>
           )}
+          {milestone.proofCid && isWalrusBlobId(milestone.proofCid) && (
+            <>
+              <span style={{ margin: "0 8px", opacity: 0.5 }}>·</span>
+              <a
+                href={walrusBlobUrl(milestone.proofCid)}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "var(--mute)", textDecoration: "underline", textUnderlineOffset: 3 }}
+                title={`Walrus blob ${milestone.proofCid}`}
+              >
+                Proof on Walrus ↗
+              </a>
+            </>
+          )}
         </div>
       </div>
       <div className="ctrl">
@@ -519,7 +534,14 @@ function UploadProofControl({ intentId, milestone }: { intentId: `0x${string}`; 
     }
     try {
       const r = await submitProof.mutateAsync({ intentId, idx: milestone.idx, file });
-      toast.push({ text: `📎 Proof uploaded · CID ${r.cid.slice(0, 12)}…`, tone: "ok" });
+      // `cid` fallback keeps the toast working against a backend that
+      // predates the Walrus migration (returns {cid} instead of {blobId}).
+      const storedId = r.blobId ?? (r as { cid?: string }).cid ?? "";
+      toast.push({
+        text: `📎 Proof stored on Walrus · ${storedId.slice(0, 10)}…`,
+        href: r.blobUrl,
+        tone: "ok",
+      });
       setFile(null);
       if (fileRef.current) fileRef.current.value = "";
       setJustUploaded(true);

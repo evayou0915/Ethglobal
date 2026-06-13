@@ -327,7 +327,12 @@ export function useClaim() {
       const walletClient = await getWalletClient(config, { chainId: ACTIVE_CHAIN.id });
       if (!walletClient || !publicClient) throw new Error("no wallet client");
 
-      const reason = keccak256(toBytes(`milestone-${args.milestoneIdx}`));
+      // Anchor the on-chain Released event to the proof content: `reason`
+      // carries the SHA-256 of the artifact stored on Walrus, so the event
+      // is a cryptographic commitment to exactly the bytes the AI verifier
+      // graded. (Fallback tag keeps old milestones claimable.)
+      const reason = (milestone.proofHash ??
+        keccak256(toBytes(`milestone-${args.milestoneIdx}`))) as `0x${string}`;
       const hash = await walletClient.writeContract({
         address: ESCROW_ADDRESS,
         abi: AURASCI_ESCROW_ABI,

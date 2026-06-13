@@ -13,7 +13,7 @@ import { proofsRouter }     from "./routes/proofs.js";
 import { aiRouter }         from "./routes/ai.js";
 import { scientistsRouter } from "./routes/scientists.js";
 import { activityRouter }   from "./routes/activity.js";
-import { ipfsRouter }       from "./routes/ipfs.js";
+import { storageRouter }    from "./routes/storage.js";
 import { leaderboardRouter } from "./routes/leaderboard.js";
 import { refundsRouter }     from "./routes/refunds.js";
 import { adminRouter }       from "./routes/admin.js";
@@ -43,7 +43,7 @@ app.route("/api",            proofsRouter);              // mounts /api/intents/
 app.route("/api/ai",         aiRouter);
 app.route("/api/scientists", scientistsRouter);
 app.route("/api/activity",   activityRouter);
-app.route("/api/ipfs-upload", ipfsRouter);
+app.route("/api/storage-upload", storageRouter);
 app.route("/api/leaderboard", leaderboardRouter);
 app.route("/api/refunds",     refundsRouter);
 app.route("/api/admin",       adminRouter);

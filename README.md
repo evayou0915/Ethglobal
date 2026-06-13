@@ -2,13 +2,15 @@
 
 > **From Proof to Capital.** Scientists publish 3-milestone research intents,
 > patrons fund them in USDC, an AI gatekeeper screens publish-time and an AI
-> verifier scores each milestone proof — capital is released tranche-by-tranche
-> from a Solidity escrow on Base, only after a verifier signature.
+> verifier grades each milestone proof straight from **Walrus** storage —
+> capital is released tranche-by-tranche from a Solidity escrow on Base,
+> only after a verifier signature.
 
 [![Base](https://img.shields.io/badge/Base-Sepolia-0052FF?style=for-the-badge&logo=coinbase)](https://sepolia.basescan.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![Hono](https://img.shields.io/badge/Hono-Backend-FF6F00?style=for-the-badge)](https://hono.dev/)
 [![Prisma](https://img.shields.io/badge/Prisma-Postgres-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io/)
+[![Walrus](https://img.shields.io/badge/Walrus-Blob_Storage-7CFBFF?style=for-the-badge)](https://www.walrus.xyz/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-license)
 
 ---
@@ -63,10 +65,12 @@ off-chain reputation, no on-chain token.
          └───────────────────────── Base RPC ───────────────────┘
 ```
 
-**The contract is a vault. The DB is the ledger.** All intent metadata,
-milestone proofs, AI scores, Aura points and activity logs live in Postgres.
-The contract only knows: balances keyed by `intentId`, the AI verifier's
-public key, and the admin's address.
+**The contract is a vault. The DB is the ledger. Walrus is the archive.**
+All intent metadata, AI scores, Aura points and activity logs live in
+Postgres. Proof artifacts (papers, datasets, figures) are stored as
+[Walrus](https://www.walrus.xyz/) blobs — the DB keeps only their blobId +
+SHA-256. The contract only knows: balances keyed by `intentId`, the AI
+verifier's public key, and the admin's address.
 
 ### Components
 
@@ -76,6 +80,7 @@ public key, and the admin's address.
 | Backend API | [`backend/src/server.ts`](backend/src/server.ts) | Hono on Node 20 |
 | Chain indexer | [`backend/src/indexer.ts`](backend/src/indexer.ts) | viem `watchContractEvent` |
 | AI worker | [`backend/src/ai-worker.ts`](backend/src/ai-worker.ts) | OpenAI-compatible LLM + EIP-712 signer |
+| Proof storage | [`backend/src/lib/walrus.ts`](backend/src/lib/walrus.ts) | Walrus HTTP publisher/aggregator (blobs certified on Sui) |
 | Smart contract | [`contracts/src/AuraSciEscrow.sol`](contracts/src/AuraSciEscrow.sol) | Solidity 0.8.24 + OZ |
 | DB schema | [`backend/prisma/schema.prisma`](backend/prisma/schema.prisma) | Postgres via Prisma |
 
@@ -101,6 +106,33 @@ authorizations without ever holding withdraw power. If the verifier key
 leaks, the worst case is forged milestone releases — admin can rotate the
 key and pause via `setPaused`. The admin key itself stays cold.
 
+The `reason` field on every milestone `release()` carries the **SHA-256 of
+the proof artifact stored on Walrus** — so each on-chain `Released` event is
+a permanent commitment to exactly the bytes the AI verifier graded. Fetch
+the blob from any Walrus aggregator, hash it, compare with the event: the
+whole release trail is independently auditable.
+
+---
+
+## 🐋 Walrus storage
+
+Proof artifacts live on [Walrus](https://www.walrus.xyz/) — decentralized
+blob storage certified on Sui, chain-agnostic by design (our money rail
+stays on Base). Three integration points:
+
+| Path | Direction | What happens |
+| --- | --- | --- |
+| [`submit-proof`](backend/src/routes/proofs.ts) | **write** | Scientist's proof file → `PUT {publisher}/v1/blobs` → blobId + SHA-256 recorded on the `Milestone` row |
+| [`scoreProof`](backend/src/lib/ai.ts) | **read** | In `llm` mode the verifier fetches the blob back from an aggregator, extracts content (PDF/text), and grades it — **the release signature only exists because Walrus returned the artifact** |
+| Frontend | **read** | "Proof on Walrus ↗" links on milestone cards resolve via the public aggregator; the on-chain `reason` anchors the same bytes |
+
+Client: [`backend/src/lib/walrus.ts`](backend/src/lib/walrus.ts) (~100
+lines, plain `fetch`, no SDK). Generic media uploads go through
+`POST /api/storage-upload` ([`backend/src/routes/storage.ts`](backend/src/routes/storage.ts)).
+The public testnet publisher/aggregator are the zero-config defaults — see
+[docs/WALRUS_INTEGRATION.md](docs/WALRUS_INTEGRATION.md) for the full
+write-up, demo script and design notes.
+
 ---
 
 ## 🧠 AI gatekeeper & verifier
@@ -113,7 +145,11 @@ Two distinct AI jobs, both run by the same worker process
 - **Pass requires BOTH** ≥3/5 agents approving AND mean score ≥ 70. Otherwise → `status = "rejected"` and the intent is hidden from the market.
 
 **Verifier** (per-milestone proof)
-- Default mode is `"approve"` — milestones auto-pass once a proof artifact is uploaded. This is a v1 demo choice; switching to real grading needs IPFS proof-body fetch (see TODO at [backend/src/lib/ai.ts:178](backend/src/lib/ai.ts#L178)).
+- In `llm` mode (set `AI_VERIFIER_MODE=llm`) the worker **fetches the proof
+  artifact back from Walrus**, extracts readable content (PDF via unpdf,
+  text formats directly), and grades it against the milestone's stated
+  deliverable. A proof that can't be retrieved never produces a release
+  signature. `approve` mode remains as a zero-LLM-key demo escape hatch.
 - On pass, the worker signs an EIP-712 release payload and caches it on the milestone row. The scientist's "Claim" button broadcasts that cached signature — failed broadcasts (cancelled popups, gas issues) become a clean "Resume claim" without re-grading.
 
 The verifier key never touches the frontend. The signed payload + nonce live
@@ -172,6 +208,10 @@ Critical vars:
 - `SIGNER_PRIVATE_KEY` — EIP-712 release signer (a fresh dev key is fine for local)
 - `ESCROW_ADDRESS` / `USDC_ADDRESS` — set to your deployed contract + USDC on Base Sepolia
 - `NEXT_PUBLIC_CHAIN_ID` (84532 for Sepolia)
+- `WALRUS_PUBLISHER_URL` / `WALRUS_AGGREGATOR_URL` — default to the public
+  Walrus testnet endpoints; no key needed
+- `AI_VERIFIER_MODE` — `llm` for real Walrus-fetch + LLM grading (needs
+  `OPENAI_API_KEY`), `approve` to demo the flow without one
 
 ### 3. Deploy / use the escrow contract
 
@@ -264,6 +304,7 @@ processes (api / indexer / ai-worker) as one unit.
 
 **Done**
 - Full create → AI gatekeeper → publish → fund → submit-proof → AI verify → release → completed flow
+- **Walrus storage end-to-end**: proofs stored as blobs at submit time, AI verifier reads them back through the aggregator before signing, on-chain `Released.reason` anchors the artifact's SHA-256, UI links resolve every proof publicly
 - Patron refund (per-rejected-milestone + full intent rejection)
 - Admin escape hatches: `refundAll`, `adminWithdraw`
 - Aura social-points: seasons, boosts, milestone-yield distribution
@@ -273,7 +314,7 @@ processes (api / indexer / ai-worker) as one unit.
 - DB-pinned wallet enforcement: no more "active wallet drifts under the contract" bugs
 
 **Stubbed by design (v1 demo)**
-- **AI verifier always approves** — the rubric path is wired but defaults to `"approve"` because IPFS proof-body fetch isn't implemented yet. See [backend/src/lib/ai.ts:149-157](backend/src/lib/ai.ts#L149-L157).
+- **Verifier default mode is `approve`** — real grading (`AI_VERIFIER_MODE=llm`) fetches the proof from Walrus and scores it with an LLM; the default stays permissive so the flow demos without an LLM key. Flip the env var for real verification.
 - **Scientist "approved" is implicit** — any user who completes `/onboard` is treated as approved; no admin review queue. See [src/app/(app)/scientist/page.tsx:44-48](src/app/(app)/scientist/page.tsx#L44-L48).
 
 **Not started**
@@ -286,6 +327,7 @@ processes (api / indexer / ai-worker) as one unit.
 ## 📚 Further reading
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system-level diagram + data flow
+- [docs/WALRUS_INTEGRATION.md](docs/WALRUS_INTEGRATION.md) — Walrus storage design, demo script, verification trail
 - [docs/BASE_MIGRATION.md](docs/BASE_MIGRATION.md) — design rationale + phase log
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploy + verify on Base
 

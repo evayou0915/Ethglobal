@@ -110,16 +110,23 @@ JWT; ownership checks (intent owner, payout target, refund eligibility) all
 compare against `User.wallet`. The frontend refuses to sign transactions
 from any other address ([`src/client/hooks.ts`](../src/client/hooks.ts)).
 
-## Proof artifacts
+## Proof artifacts — Walrus
 
 Milestone proofs (PDFs, datasets, images, archives ≤ 50 MB) are uploaded via
 `POST /api/intents/:id/milestones/:idx/submit-proof`
 ([`backend/src/routes/proofs.ts`](../backend/src/routes/proofs.ts)). The
-backend computes a SHA-256 of the bytes, stores the file on decentralized
-storage, and records the content id + hash + filename on the `Milestone`
-row. The hash binds what the verifier graded to what was uploaded — even if
-the storage gateway disappears, the hash plus a re-uploaded copy of the
-file proves the original content.
+backend computes a SHA-256 of the bytes, stores the file as a
+[Walrus](https://www.walrus.xyz/) blob
+([`backend/src/lib/walrus.ts`](../backend/src/lib/walrus.ts)), and records
+the blobId + hash + filename on the `Milestone` row.
+
+The artifact round-trips through Walrus on the money path: in `llm` mode
+the verifier fetches the blob back from an aggregator and grades the actual
+content before signing the release. The frontend renders public
+"Proof on Walrus ↗" aggregator links, and the on-chain `release()` carries
+the artifact's SHA-256 as `reason` — so every `Released` event commits to
+the exact bytes stored on Walrus. Full write-up:
+[WALRUS_INTEGRATION.md](WALRUS_INTEGRATION.md).
 
 ## Deployment topology
 

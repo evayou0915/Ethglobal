@@ -120,7 +120,7 @@ export const api = {
   submitProof: (intentId: string, idx: number, file: File) => {
     const fd = new FormData();
     fd.append("file", file);
-    return fileFetch<{ cid: string; proofHash: string }>(
+    return fileFetch<{ blobId: string; blobUrl: string; suiObjectId: string | null; proofHash: string }>(
       `/api/intents/${encodeURIComponent(intentId)}/milestones/${idx}/submit-proof`,
       fd,
     );

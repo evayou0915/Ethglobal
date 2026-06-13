@@ -32,7 +32,12 @@ export const ENV = {
 
   SIGNER_PRIVATE_KEY:     (process.env.SIGNER_PRIVATE_KEY ?? "") as `0x${string}` | "",
 
-  PINATA_JWT:     process.env.PINATA_JWT ?? "",
+  // Walrus blob storage (proof artifacts + app media). The public testnet
+  // endpoints work with no key; swap for your own publisher/aggregator in prod.
+  WALRUS_PUBLISHER_URL:  optional("WALRUS_PUBLISHER_URL", "https://publisher.walrus-testnet.walrus.space").replace(/\/$/, ""),
+  WALRUS_AGGREGATOR_URL: optional("WALRUS_AGGREGATOR_URL", "https://aggregator.walrus-testnet.walrus.space").replace(/\/$/, ""),
+  WALRUS_EPOCHS:         Number(optional("WALRUS_EPOCHS", "5")),
+
   // OpenAI-compatible relay. Any provider that exposes `/v1/chat/completions`
   // works (LiteLLM, OpenRouter, Anthropic's compat endpoint, your own proxy).
   // Leave OPENAI_BASE_URL unset to hit api.openai.com.

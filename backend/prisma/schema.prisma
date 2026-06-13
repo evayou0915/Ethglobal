@@ -160,7 +160,7 @@ model Milestone {
 
   status              MilestoneStatus @default(locked)
 
-  proofCid            String?         @db.VarChar(80)    // IPFS CID v0/v1
+  proofCid            String?         @db.VarChar(80)    // Walrus blobId (base64url u256)
   proofHash           String?         @db.VarChar(66)    // 0x + SHA-256
   proofFileName       String?         @db.VarChar(255)
   proofFileMime       String?         @db.VarChar(100)
