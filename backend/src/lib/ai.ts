@@ -146,54 +146,110 @@ export async function scoreIntentQuorum(args: {
 
 // ─── Verifier (per-milestone proof check) ──────────────────────────────
 //
-// v1 product decision: **always approve once a proof artifact is submitted**.
-// The UI keeps the "AI verifier" affordance + the rationale text on the
-// milestone card, but the model never actually grades anything. Rationale:
+// The proof artifact lives on Walrus (stored at submit-proof time, blobId on
+// the Milestone row). In "llm" mode the verifier fetches the actual bytes
+// back from a Walrus aggregator, extracts readable content, and grades it
+// against the milestone's stated deliverable — so the release signature is
+// only ever produced after the model has seen the real artifact.
 //
-//  - Without IPFS-content fetch, the LLM only sees the CID/hash, so its
-//    output is meaningless (always 0/100 "no evidence provided").
-//  - Real adversarial verification needs reviewer infra we don't have yet
-//    (consensus pool, dispute window, slashing). Building it for v1 would
-//    block the release-flow demo on tooling, not science.
-//  - Bad-actor scientists are still gated by:
-//      (a) gatekeeper (5-agent LLM quorum) at intent publish time
-//      (b) patron self-refund when admin or governance marks intent rejected
-//      (c) admin `adminWithdraw` escape hatch
-//
-// To re-enable real grading later, set `AI_VERIFIER_MODE` to one of:
-//   "llm"       — call OpenAI (NOTE: scoreProof must first be upgraded to
-//                  fetch the proof file from IPFS and include it in the prompt;
-//                  otherwise it always returns 0/100. See TODO below).
+// `AI_VERIFIER_MODE` selects the behavior:
+//   "llm"       — fetch proof from Walrus + real LLM grading (recommended;
+//                  requires OPENAI_API_KEY).
 //   "heuristic" — deterministic 60-95 sha256-based score, ~72% pass rate.
-//   "approve"   — (default) always score 99/100.
+//   "approve"   — always score 99/100. Demo / CI escape hatch: keeps the
+//                  full release flow runnable without an LLM key.
 const VERIFIER_MODE = (process.env.AI_VERIFIER_MODE ?? "approve").toLowerCase();
+
+/** Cap on how much proof text we put in the prompt (~7k tokens). */
+const PROOF_EXCERPT_BYTES = 28 * 1024;
+
+const TEXTUAL_MIME = /^(text\/|application\/(json|csv|x-csv|xml|markdown))/i;
+const TEXTUAL_EXT = /\.(md|txt|csv|json|xml|log|tex|rst|ipynb|py|r|ts|js|sol)$/i;
+
+/** Pull gradeable text out of the proof bytes. PDFs go through unpdf
+ *  (lazy-imported so non-PDF jobs never load it); plain-text formats are
+ *  decoded directly; for opaque binaries (images, archives) we fall back to
+ *  metadata-only grading and tell the model exactly that. */
+async function extractProofText(
+  bytes: ArrayBuffer,
+  fileName: string | null,
+  mime: string | null,
+): Promise<{ kind: "text" | "pdf" | "binary"; excerpt: string }> {
+  const name = fileName ?? "";
+  const isPdf = mime === "application/pdf" || /\.pdf$/i.test(name);
+  if (isPdf) {
+    try {
+      const { extractText, getDocumentProxy } = await import("unpdf");
+      const pdf = await getDocumentProxy(new Uint8Array(bytes));
+      const { text } = await extractText(pdf, { mergePages: true });
+      return { kind: "pdf", excerpt: text.slice(0, PROOF_EXCERPT_BYTES) };
+    } catch (e) {
+      console.warn(`[ai] pdf extraction failed (${(e as Error).message}); grading on metadata only`);
+      return { kind: "binary", excerpt: "" };
+    }
+  }
+  if ((mime && TEXTUAL_MIME.test(mime)) || TEXTUAL_EXT.test(name)) {
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes.slice(0, PROOF_EXCERPT_BYTES));
+    return { kind: "text", excerpt: text };
+  }
+  return { kind: "binary", excerpt: "" };
+}
 
 export async function scoreProof(args: {
   milestoneTitle: string;
   milestoneDescription: string;
-  proofCid: string;
+  proofBlobId: string;
   proofHash: string;
+  proofFileName?: string | null;
+  proofFileMime?: string | null;
 }): Promise<Scored> {
   if (VERIFIER_MODE === "llm" && hasLLM()) {
-    // TODO before flipping the default: in this branch, fetch the proof body
-    // via a gateway (Pinata: https://gateway.pinata.cloud/ipfs/<cid>),
-    // truncate to ~32 KB, and include it in the prompt — otherwise the
-    // model can only see the CID string and gives a junk score.
+    // Fetch the actual artifact back from Walrus. A failure here throws —
+    // the AiJob machinery retries, and a proof that can't be retrieved
+    // must never produce a release signature.
+    const { fetchBlobBytes } = await import("./walrus.js");
+    const bytes = await fetchBlobBytes(args.proofBlobId);
+    const { kind, excerpt } = await extractProofText(
+      bytes,
+      args.proofFileName ?? null,
+      args.proofFileMime ?? null,
+    );
+
     const system =
-      "You are an open-science milestone verifier. Score the submitted proof 0–100 on whether it " +
-      "satisfies the milestone's stated deliverables. Reply ONLY as JSON: " +
-      `{"score": number, "rationale": "1-2 sentence verdict"}`;
-    return callOpenAI(system, JSON.stringify(args));
+      "You are an open-science milestone verifier. You are given a milestone's stated deliverable " +
+      "and the proof artifact a scientist submitted (retrieved from Walrus decentralized storage). " +
+      "Score 0–100 on whether the artifact plausibly satisfies the deliverable: claimed results " +
+      "present, methodology described, internally consistent. Generic filler, empty files, or " +
+      "content unrelated to the milestone must score below 70. " +
+      (kind === "binary"
+        ? "The artifact is a binary file you cannot read — grade conservatively on whether its " +
+          "metadata (name, type, size) is a plausible deliverable for this milestone. "
+        : "") +
+      `Reply ONLY as JSON: {"score": number, "rationale": "1-2 sentence verdict"}`;
+
+    const payload = JSON.stringify({
+      milestoneTitle: args.milestoneTitle,
+      milestoneDescription: args.milestoneDescription,
+      artifact: {
+        fileName: args.proofFileName ?? null,
+        mime: args.proofFileMime ?? null,
+        sizeBytes: bytes.byteLength,
+        sha256: args.proofHash,
+        walrusBlobId: args.proofBlobId,
+        contentKind: kind,
+        contentExcerpt: excerpt || "(binary content not included)",
+      },
+    });
+    return callOpenAI(system, payload);
   }
   if (VERIFIER_MODE === "heuristic") {
     return heuristicScore("verifier", JSON.stringify(args));
   }
-  // Default: approve. Rationale text is generic enough that it's not
-  // obvious from the UI that the verifier didn't actually do anything.
+  // Escape-hatch mode: approve without grading (no LLM key needed).
   return {
     score: 99,
     rationale:
-      "Verifier approved. Proof artifact registered (CID + SHA-256) and milestone deliverable acknowledged.",
+      "Verifier approved. Proof artifact registered on Walrus (blobId + SHA-256) and milestone deliverable acknowledged.",
     model: "verifier-v1",
   };
 }

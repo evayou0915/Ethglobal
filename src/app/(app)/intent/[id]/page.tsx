@@ -8,6 +8,7 @@ import { useAuth } from "@/client/auth";
 import { useAdminRefundAll, useAdminWithdraw, useAuraBoost, useAuraHeat, useAuraLeaderboard, useAuraSeason, useFund, useIntent, useRefund, useRefundEligibility, useSession } from "@/client/hooks";
 import { useToast } from "@/components/Toast";
 import { useSignInModal } from "@/client/sign-in-store";
+import { walrusBlobUrl } from "@/client/walrus";
 import type { IntentDto, MilestoneDto } from "@/types/api";
 
 // ─── Display helpers ────────────────────────────────────────────────────
@@ -349,7 +350,13 @@ export default function IntentDetailPage() {
                             <p style={{ fontSize: 13, color: "var(--ink-3)", lineHeight: 1.6, margin: "10px 0 0" }}>{desc}</p>
                           )}
                           <div className="meta">
-                            <span><b>{m.proofUploadedAt ? "Proof submitted" : "Awaiting proof"}</b></span>
+                            <span><b>{m.proofUploadedAt
+                              ? (m.proofCid
+                                  ? <a href={walrusBlobUrl(m.proofCid)} target="_blank" rel="noreferrer"
+                                       style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
+                                       title={`Walrus blob ${m.proofCid}`}>Proof on Walrus ↗</a>
+                                  : "Proof submitted")
+                              : "Awaiting proof"}</b></span>
                             <span className="release">Releases ${releaseHuman.toLocaleString()} USDC</span>
                             {due && (
                               <span style={{ color: overdue ? "#b91c1c" : undefined, fontWeight: overdue ? 600 : undefined }}>

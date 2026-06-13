@@ -140,8 +140,10 @@ async function runVerifier(jobId: string, intentId: string, milestoneId: string)
   const scored = await scoreProof({
     milestoneTitle: milestone.title,
     milestoneDescription: milestone.descriptionMd,
-    proofCid: milestone.proofCid,
+    proofBlobId: milestone.proofCid, // Walrus blobId (column name is historical)
     proofHash: milestone.proofHash,
+    proofFileName: milestone.proofFileName,
+    proofFileMime: milestone.proofFileMime,
   });
 
   if (scored.score < PASS_THRESHOLD) {

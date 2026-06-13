@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { prisma } from "../lib/db.js";
 import { ok } from "../lib/http.js";
 import { assertIntentOwner, requireAuth } from "../lib/auth.js";
-import { pinFileToIpfs, sha256Hex } from "../lib/ipfs.js";
+import { storeBlob, sha256Hex, aggregatorBlobUrl } from "../lib/walrus.js";
 
 export const proofsRouter = new Hono();
 
@@ -41,12 +41,16 @@ proofsRouter.post("/intents/:id/milestones/:idx/submit-proof", requireAuth, asyn
   const bytes = await file.arrayBuffer();
   const proofHash = await sha256Hex(bytes);
   const repacked = new File([bytes], file.name, { type: file.type });
-  const { cid } = await pinFileToIpfs(repacked);
+  // Store the artifact on Walrus. blobId is a content address — the same
+  // bytes always map to the same id, and proofHash (sha-256) binds what the
+  // AI verifier grades (and what `release()` anchors on-chain as `reason`)
+  // to exactly these bytes.
+  const stored = await storeBlob(repacked);
 
   const updated = await prisma.milestone.update({
     where: { id: milestone.id },
     data: {
-      proofCid: cid,
+      proofCid: stored.blobId,
       proofHash,
       proofFileName: file.name.slice(0, 255),
       proofFileMime: file.type.slice(0, 100) || null,
@@ -55,5 +59,11 @@ proofsRouter.post("/intents/:id/milestones/:idx/submit-proof", requireAuth, asyn
     },
   });
 
-  return ok(c, { cid, proofHash, milestone: updated });
+  return ok(c, {
+    blobId: stored.blobId,
+    blobUrl: aggregatorBlobUrl(stored.blobId),
+    suiObjectId: stored.suiObjectId,
+    proofHash,
+    milestone: updated,
+  });
 });

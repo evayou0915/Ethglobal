@@ -35,8 +35,8 @@ export interface MilestoneDto {
   releaseAmountUsdc: string; // BigInt → string
   dueDate: string | null;
   status: MilestoneStatus;
-  proofCid: string | null;
-  proofHash: string | null;
+  proofCid: string | null;   // Walrus blobId of the proof artifact
+  proofHash: string | null;  // 0x + SHA-256 of the artifact bytes
   proofFileName: string | null;
   proofUploadedAt: string | null;
   aiScore: number | null;
