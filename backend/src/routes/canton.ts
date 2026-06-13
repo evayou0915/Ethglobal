@@ -28,7 +28,7 @@ cantonRouter.get("/intents/:id", optionalAuth, async (c) => {
 });
 
 const FundSchema = z.object({
-  intentId: z.string().regex(/^0x[0-9a-f]{64}$/i),
+  intentId: z.string().regex(/^0x[0-9a-z]{64}$/i),
   amountUsd: z.number().positive().max(10_000_000),
 });
 
@@ -60,7 +60,7 @@ cantonRouter.post("/fund", requireAuth, async (c) => {
 });
 
 const ReleaseSchema = z.object({
-  intentId: z.string().regex(/^0x[0-9a-f]{64}$/i),
+  intentId: z.string().regex(/^0x[0-9a-z]{64}$/i),
   milestoneIdx: z.number().int().min(0).max(50),
 });
 
