@@ -77,6 +77,7 @@ verifier's public key, and the admin's address.
 | Layer | Path | Stack |
 | --- | --- | --- |
 | Frontend | [`src/`](src/) | Next.js 14 App Router + wagmi/viem + SIWE wallet login |
+| Canton rail | [`canton/`](canton/) | Daml templates for ledger-private patronage (see [canton/README.md](canton/README.md)) |
 | Backend API | [`backend/src/server.ts`](backend/src/server.ts) | Hono on Node 20 |
 | Chain indexer | [`backend/src/indexer.ts`](backend/src/indexer.ts) | viem `watchContractEvent` |
 | AI worker | [`backend/src/ai-worker.ts`](backend/src/ai-worker.ts) | OpenAI-compatible LLM + EIP-712 signer |

@@ -1,0 +1,17 @@
+sdk-version: 2.10.3
+name: aurasci-canton
+version: 0.1.0
+source: daml
+init-script: AuraSci.Setup:setup
+parties:
+  - Operator
+  - Verifier
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script-lts
+start-navigator: false
+# LF 1.17 enables package-name template addressing ("#aurasci-canton:…")
+# so the backend never has to hardcode a package id.
+build-options:
+  - --target=1.17

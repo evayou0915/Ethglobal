@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useAccount } from "wagmi";
 import { useAuth } from "@/client/auth";
-import { useAdminRefundAll, useAdminWithdraw, useAuraBoost, useAuraHeat, useAuraLeaderboard, useAuraSeason, useFund, useIntent, useRefund, useRefundEligibility, useSession } from "@/client/hooks";
+import { useAdminRefundAll, useAdminWithdraw, useAuraBoost, useAuraHeat, useAuraLeaderboard, useAuraSeason, useCantonFund, useCantonSummary, useFund, useIntent, useRefund, useRefundEligibility, useSession } from "@/client/hooks";
 import { useToast } from "@/components/Toast";
 import { useSignInModal } from "@/client/sign-in-store";
 import { isWalrusBlobId, walrusBlobUrl } from "@/client/walrus";
@@ -72,6 +72,13 @@ export default function IntentDetailPage() {
   const toast = useToast();
   const openSignIn = useSignInModal((s) => s.open);
 
+  // Canton private rail — null summary means the backend has the rail
+  // disabled and the toggle below is hidden entirely.
+  const [privateRail, setPrivateRail] = useState(false);
+  const cantonSummary = useCantonSummary(id);
+  const cantonFund = useCantonFund();
+  const cantonEnabled = cantonSummary.data !== null && !cantonSummary.isError;
+
   // ─── Loading / not-found gates ────────────────────────────────────────
   if (intentQ.isLoading) {
     return (
@@ -137,8 +144,15 @@ export default function IntentDetailPage() {
       return;
     }
     try {
-      const res = await fund.mutateAsync({ intentId: intentIdHex, humanAmount: v });
-      toast.push({ text: `💎 Patronized $${v.toLocaleString()} USDC`, href: res.url, tone: "ok" });
+      if (privateRail) {
+        // Canton rail: custodial party, no wallet popup, ledger-enforced
+        // privacy — only you and the platform can see this patronage.
+        await cantonFund.mutateAsync({ intentId: intentIdHex, amountUsd: v });
+        toast.push({ text: `🔒 Privately patronized $${v.toLocaleString()} via Canton`, tone: "ok" });
+      } else {
+        const res = await fund.mutateAsync({ intentId: intentIdHex, humanAmount: v });
+        toast.push({ text: `💎 Patronized $${v.toLocaleString()} USDC`, href: res.url, tone: "ok" });
+      }
       setAmount("");
     } catch (e: any) {
       toast.push({ text: "Fund failed: " + (e?.shortMessage ?? e?.message ?? String(e)), tone: "err" });
@@ -238,14 +252,46 @@ export default function IntentDetailPage() {
                     <button key={q} onClick={() => setAmount(String(q))}>${q.toLocaleString()}</button>
                   ))}
                 </div>
+                {cantonEnabled && (
+                  <label className="canton-toggle">
+                    <input
+                      type="checkbox"
+                      checked={privateRail}
+                      onChange={(e) => setPrivateRail(e.target.checked)}
+                    />
+                    <span className="ct-ic">🔒</span>
+                    <span>
+                      <b>Fund privately via Canton</b>
+                      <em>Amount &amp; identity visible only to you, the scientist and AuraSci — enforced by the ledger, not the UI.</em>
+                    </span>
+                  </label>
+                )}
                 {authenticated ? (
-                  <button className="fund-cta" onClick={doFund} disabled={fund.isPending}>
-                    {fund.isPending ? "Confirming…" : "Fund this research"} <span className="arr">→</span>
+                  <button className="fund-cta" onClick={doFund} disabled={fund.isPending || cantonFund.isPending}>
+                    {fund.isPending || cantonFund.isPending
+                      ? "Confirming…"
+                      : privateRail ? "Fund privately" : "Fund this research"} <span className="arr">→</span>
                   </button>
                 ) : (
                   <button className="fund-cta" onClick={openSignIn}>
                     Sign in to fund <span className="arr">→</span>
                   </button>
+                )}
+
+                {cantonEnabled && (cantonSummary.data?.patronCount ?? 0) > 0 && (
+                  <div className="canton-summary">
+                    <div className="cs-head">🔒 Private rail · Canton</div>
+                    <div className="cs-line">
+                      <b>${(cantonSummary.data!.totalUsd).toLocaleString()}</b> from{" "}
+                      <b>{cantonSummary.data!.patronCount}</b> private patron{cantonSummary.data!.patronCount === 1 ? "" : "s"}
+                    </div>
+                    {(cantonSummary.data!.mine?.length ?? 0) > 0 && (
+                      <div className="cs-mine">
+                        Your private patronage: <b>${cantonSummary.data!.mine.reduce((s, p) => s + p.amount, 0).toLocaleString()}</b>
+                        <span> — only you can see this line.</span>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 <div className="fund-trust">
@@ -472,6 +518,16 @@ export default function IntentDetailPage() {
         .fund-quick { display: flex; gap: 6px; margin-top: 10px; }
         .fund-quick :global(button) { flex: 1; padding: 8px; background: transparent; border: 1px solid var(--line); color: var(--ink-3); font-family: 'JetBrains Mono', monospace; font-size: 12px; border-radius: 4px; cursor: pointer; transition: all .2s; }
         .fund-quick :global(button:hover) { border-color: var(--rust); color: var(--rust); background: rgba(254,215,170,0.18); }
+        .canton-toggle { display: flex; align-items: flex-start; gap: 10px; margin: 14px 0 4px; padding: 12px 14px; border-radius: 6px; border: 1px dashed rgba(58,36,24,0.25); background: rgba(254,215,170,0.18); cursor: pointer; }
+        .canton-toggle input { margin-top: 3px; accent-color: var(--rust); }
+        .canton-toggle .ct-ic { font-size: 14px; line-height: 1.3; }
+        .canton-toggle span b { display: block; font: 600 13px Inter, sans-serif; color: var(--ink); }
+        .canton-toggle span em { display: block; font: 11px/1.5 Inter, sans-serif; font-style: normal; color: var(--mute); margin-top: 2px; }
+        .canton-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(58,36,24,0.04); border: 1px solid var(--line); }
+        .canton-summary .cs-head { font: 600 10px JetBrains Mono, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); margin-bottom: 6px; }
+        .canton-summary .cs-line { font: 13px Inter, sans-serif; color: var(--ink-2); }
+        .canton-summary .cs-mine { margin-top: 6px; font: 12px Inter, sans-serif; color: var(--rust); }
+        .canton-summary .cs-mine span { color: var(--mute); }
         .fund-trust { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
         .fund-trust .tr { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
         .fund-trust .tr :global(svg) { flex-shrink: 0; color: #65a30d; }

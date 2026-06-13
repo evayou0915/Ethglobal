@@ -175,6 +175,27 @@ export const api = {
       `/api/aura/leaderboard${limit ? `?limit=${limit}` : ""}`,
     ),
 
+  // Canton private rail (optional backend feature — 503 when disabled)
+  cantonIntent: (intentId: string) =>
+    jsonFetch<{ totalUsd: number; patronCount: number; mine: Array<{ amount: number }> }>(
+      `/api/canton/intents/${encodeURIComponent(intentId)}`,
+    ),
+  cantonFund: (intentId: string, amountUsd: number) =>
+    jsonFetch<{ patronageCid: string; totalUsd: number; patronCount: number; mine: Array<{ amount: number }> }>(
+      "/api/canton/fund",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ intentId, amountUsd }),
+      },
+    ),
+  cantonRelease: (intentId: string, milestoneIdx: number) =>
+    jsonFetch<{ released: number; aiScore: number }>("/api/canton/release", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ intentId, milestoneIdx }),
+    }),
+
   /** Poll an AiJob until it leaves queued/running. Default 90s timeout. */
   async waitForJob(id: string, opts: { intervalMs?: number; timeoutMs?: number } = {}): Promise<AiJobDto> {
     const interval = opts.intervalMs ?? 1500;

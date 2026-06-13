@@ -18,6 +18,7 @@ import { leaderboardRouter } from "./routes/leaderboard.js";
 import { refundsRouter }     from "./routes/refunds.js";
 import { adminRouter }       from "./routes/admin.js";
 import { auraRouter }        from "./routes/aura.js";
+import { cantonRouter }      from "./routes/canton.js";
 
 const app = new Hono();
 
@@ -48,6 +49,7 @@ app.route("/api/leaderboard", leaderboardRouter);
 app.route("/api/refunds",     refundsRouter);
 app.route("/api/admin",       adminRouter);
 app.route("/api/aura",        auraRouter);
+app.route("/api/canton",      cantonRouter);
 
 // Centralized error handler
 app.onError((err, c) => {

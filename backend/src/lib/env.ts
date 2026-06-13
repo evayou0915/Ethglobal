@@ -45,6 +45,11 @@ export const ENV = {
   OPENAI_BASE_URL: optional("OPENAI_BASE_URL", "https://api.openai.com/v1").replace(/\/$/, ""),
   OPENAI_MODEL:    optional("OPENAI_MODEL", "gpt-4o-mini"),
 
+  // Canton private rail — JSON Ledger API of the sandbox started by
+  // `daml start` in canton/ (default http://localhost:7575). Empty = the
+  // /api/canton routes answer 503 and the rest of the app is unaffected.
+  CANTON_JSON_API_URL: (process.env.CANTON_JSON_API_URL ?? "").replace(/\/$/, ""),
+
   INDEXER_CONFIRMATIONS: Number(optional("INDEXER_CONFIRMATIONS", "1")),
   INDEXER_POLL_MS:       Number(optional("INDEXER_POLL_MS", "4000")),
 } as const;

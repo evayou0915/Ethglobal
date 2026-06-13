@@ -1,0 +1,86 @@
+-- End-to-end test of the Canton rail. Doubles as the demo script:
+-- the privacy assertions here are the headline — patron B's node simply
+-- never receives patron A's Patronage contract.
+module AuraSci.Test where
+
+import Daml.Script
+import DA.Foldable (forA_)
+import DA.List (head, sortOn)
+import AuraSci
+
+testPrivatePatronageFlow : Script ()
+testPrivatePatronageFlow = do
+  operator  <- allocateParty "Operator"
+  verifier  <- allocateParty "Verifier"
+  alice     <- allocateParty "DrAlice"      -- scientist
+  pharmaA   <- allocateParty "PharmaA"      -- institutional patron 1
+  pharmaB   <- allocateParty "PharmaB"      -- institutional patron 2 (competitor!)
+
+  -- 1. Operator publishes the intent (same intentId as the Base/DB row).
+  intentCid <- submit operator do
+    createCmd ResearchIntent with
+      operator; scientist = alice; verifier
+      intentId = "0xabc123"
+      title = "Senolytic clearance in aged murine cardiac tissue"
+      fundingGoal = 50000.0
+      milestones =
+        [ Milestone 0 "Protocol registration + cohort acquisition" 10000.0 False
+        , Milestone 1 "Treatment arm complete, histology submitted" 25000.0 False
+        , Milestone 2 "Peer-review preprint published" 15000.0 False
+        ]
+
+  -- 2. Two competing pharma companies fund the same intent privately.
+  pA <- submitMulti [pharmaA, operator] [] do
+    exerciseCmd intentCid Fund with patron = pharmaA, amount = 30000.0
+  _pB <- submitMulti [pharmaB, operator] [] do
+    exerciseCmd intentCid Fund with patron = pharmaB, amount = 12000.0
+
+  -- 3. ★ PRIVACY ASSERTIONS ★
+  -- PharmaB queries its node's active contract set: it sees ONLY its own
+  -- patronage. PharmaA's 30k simply does not exist on B's participant.
+  bSees <- query @Patronage pharmaB
+  assertMsg "competitor must see exactly its own patronage" (length bSees == 1)
+  forA_ bSees \(_, p) -> assertMsg "B sees only B" (p.patron == pharmaB)
+
+  aSees <- query @Patronage pharmaA
+  assertMsg "patron A sees only its own patronage" (length aSees == 1)
+
+  -- The operator (platform) sees both — it can aggregate "N private
+  -- patrons · $X total" for the UI without leaking who funded what.
+  opSees <- query @Patronage operator
+  assertMsg "operator aggregates all patronages" (length opSees == 2)
+  let total = sum (map (\(_, p) -> p.amount) opSees)
+  assertMsg "aggregate = 42k" (total == 42000.0)
+
+  -- 4. AI verifier scores milestone 0 at 88/100 → dual-controlled release.
+  --    (On Base this is the EIP-712 signature; here it's native Daml
+  --    authorization from the verifier party.)
+  (intentCid2, _payout) <- submitMulti [operator, verifier] [] do
+    exerciseCmd intentCid ReleaseMilestone with milestoneIdx = 0, aiScore = 88
+
+  -- The scientist sees her payout receipt.
+  payouts <- query @Payout alice
+  assertMsg "scientist has one payout" (length payouts == 1)
+  forA_ payouts \(_, p) -> do
+    assertMsg "payout amount matches milestone 0" (p.amount == 10000.0)
+
+  -- 5. Negative paths.
+  -- 5a. A low AI score cannot release (threshold 70).
+  submitMultiMustFail [operator, verifier] [] do
+    exerciseCmd intentCid2 ReleaseMilestone with milestoneIdx = 1, aiScore = 55
+  -- 5b. The verifier alone (without the operator) cannot release.
+  submitMustFail verifier do
+    exerciseCmd intentCid2 ReleaseMilestone with milestoneIdx = 1, aiScore = 99
+  -- 5c. Double-release of milestone 0 is rejected.
+  submitMultiMustFail [operator, verifier] [] do
+    exerciseCmd intentCid2 ReleaseMilestone with milestoneIdx = 0, aiScore = 99
+  -- 5d. A patron can't forge a patronage without the operator co-signing.
+  submitMustFail pharmaB do
+    exerciseCmd intentCid2 Fund with patron = pharmaB, amount = 1.0
+
+  -- 6. Milestone state advanced on the recreated intent.
+  Some (_, intent) <- queryContractKey @ResearchIntent operator (operator, "0xabc123")
+  let m0 = head (sortOn (.idx) intent.milestones)
+  assertMsg "milestone 0 marked released" m0.released
+
+  debug "✦ AuraSci Canton rail: full flow + privacy assertions passed"

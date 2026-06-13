@@ -1,0 +1,14 @@
+-- Sandbox bootstrap, run automatically by `daml start` (see init-script
+-- in daml.yaml). Allocates the two platform parties the backend signs as.
+-- User parties (one per SIWE wallet) are allocated lazily by the backend
+-- via the JSON API the first time a user funds through the Canton rail.
+module AuraSci.Setup where
+
+import Daml.Script
+
+setup : Script ()
+setup = do
+  _operator <- allocatePartyWithHint "Operator" (PartyIdHint "Operator")
+  _verifier <- allocatePartyWithHint "Verifier" (PartyIdHint "Verifier")
+  debug "AuraSci sandbox ready: Operator + Verifier allocated"
+  pure ()

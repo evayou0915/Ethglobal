@@ -1,0 +1,124 @@
+-- AuraSci on Canton — the private patronage rail.
+--
+-- The Base/Solidity escrow is fully public: every deposit amount and patron
+-- address is on-chain for anyone to read. This module is the Canton mirror
+-- of that escrow where privacy is enforced BY THE LEDGER, not by the UI:
+-- a Patronage contract is only ever distributed to the participant nodes
+-- of its stakeholders (patron, operator, scientist). Other patrons — and
+-- everyone else on the network — cannot see it exists.
+--
+-- Money is modelled as a plain Decimal amount ("mock USDCx") so the demo
+-- has zero token-standard dependencies. Production swaps the `amount`
+-- fields for CIP-0056 token-standard holdings (Circle USDCx on Canton).
+module AuraSci where
+
+-- One funding tranche. Mirrors the Milestone rows in the AuraSci Postgres
+-- schema (idx / releaseAmountUsdc / status).
+data Milestone = Milestone
+  with
+    idx : Int
+    description : Text
+    amount : Decimal      -- USDCx released when this milestone verifies
+    released : Bool
+  deriving (Eq, Show)
+
+-- ─── Research intent (the fundable asset) ───────────────────────────────
+--
+-- Created by the platform operator on behalf of an onboarded scientist;
+-- `intentId` is the same 0x hash used on Base + in Postgres, so the two
+-- rails stay joinable. The AI verifier party is fixed at creation time —
+-- it is the Canton analogue of the EIP-712 signer key on Base.
+template ResearchIntent
+  with
+    operator : Party
+    scientist : Party
+    verifier : Party
+    intentId : Text
+    title : Text
+    fundingGoal : Decimal
+    milestones : [Milestone]
+  where
+    signatory operator
+    observer scientist, verifier
+
+    key (operator, intentId) : (Party, Text)
+    maintainer key._1
+
+    -- Accept a private patronage. Exercised by the patron (with the
+    -- operator's authority via the choice's controller pair — the
+    -- operator co-signs every patronage so it can aggregate totals and
+    -- run refunds). Returns the new Patronage so callers can show it.
+    nonconsuming choice Fund : ContractId Patronage
+      with
+        patron : Party
+        amount : Decimal
+      controller patron, operator
+      do
+        assertMsg "amount must be positive" (amount > 0.0)
+        create Patronage with operator; patron; scientist; intentId; amount
+
+    -- Release one milestone tranche to the scientist. Requires BOTH the
+    -- operator and the AI-verifier party — on Base this is the EIP-712
+    -- signature check inside the Solidity escrow; here it is native Daml
+    -- authorization. Consumes and recreates the intent with the milestone
+    -- marked released, and mints a Payout receipt for the scientist.
+    choice ReleaseMilestone : (ContractId ResearchIntent, ContractId Payout)
+      with
+        milestoneIdx : Int
+        aiScore : Int
+      controller operator, verifier
+      do
+        assertMsg "score below release threshold (70)" (aiScore >= 70)
+        let target = find (\m -> m.idx == milestoneIdx) milestones
+        case target of
+          None -> abort "milestone not found"
+          Some m -> do
+            assertMsg "milestone already released" (not m.released)
+            let updated = map (\x -> if x.idx == milestoneIdx then x with released = True else x) milestones
+            intentCid <- create this with milestones = updated
+            payoutCid <- create Payout with
+              operator; scientist; intentId
+              milestoneIdx; amount = m.amount; aiScore
+            pure (intentCid, payoutCid)
+
+-- ─── Private patronage ──────────────────────────────────────────────────
+--
+-- THE point of the Canton rail. Stakeholders are patron + operator +
+-- scientist only: no other patron, competitor, or network participant is
+-- ever sent this contract. Compare with Base, where `Deposited(intentId,
+-- patron, amount)` is a public event log readable by anyone.
+template Patronage
+  with
+    operator : Party
+    patron : Party
+    scientist : Party
+    intentId : Text
+    amount : Decimal
+  where
+    signatory patron, operator
+    observer scientist
+
+    -- Pre-funding-deadline exit, mirroring the Base refund flow. The
+    -- patron initiates; the operator's signatory authority is already on
+    -- the contract, so archiving needs both — same dual-control as Base
+    -- where refunds need the backend's signed quote.
+    choice Withdraw : ()
+      controller patron, operator
+      do pure ()
+
+-- ─── Payout receipt ─────────────────────────────────────────────────────
+--
+-- Created by ReleaseMilestone; the scientist's proof that a tranche was
+-- released, with the AI score that authorized it. Production: replaced by
+-- an actual USDCx transfer-instruction to the scientist's wallet.
+template Payout
+  with
+    operator : Party
+    scientist : Party
+    intentId : Text
+    milestoneIdx : Int
+    amount : Decimal
+    aiScore : Int
+  where
+    signatory operator
+    observer scientist

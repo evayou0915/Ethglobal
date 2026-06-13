@@ -424,6 +424,39 @@ export function useRefund() {
   });
 }
 
+// ─── Canton private rail ────────────────────────────────────────────────
+
+/** Aggregate private-rail funding for an intent. Returns null (not an
+ *  error state) when the backend has the Canton rail disabled, so pages
+ *  can simply hide the private block. */
+export function useCantonSummary(intentId: string | undefined) {
+  return useQuery({
+    queryKey: ["canton-intent", intentId],
+    queryFn: async () => {
+      try { return await api.cantonIntent(intentId!); }
+      catch (e: any) {
+        if (/disabled|503/i.test(e?.message ?? "")) return null;
+        throw e;
+      }
+    },
+    enabled: Boolean(intentId),
+    retry: false,
+  });
+}
+
+/** Fund through the Canton rail — custodial party, no wallet popup. The
+ *  ledger (not the UI) keeps the patronage private to its stakeholders. */
+export function useCantonFund() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { intentId: string; amountUsd: number }) =>
+      api.cantonFund(args.intentId, args.amountUsd),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["canton-intent", vars.intentId] });
+    },
+  });
+}
+
 // ─── Aura (social points) ──────────────────────────────────────────────
 
 export function useAuraSeason() {

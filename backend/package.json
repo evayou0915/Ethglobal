@@ -22,7 +22,8 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "canton:smoke": "tsx scripts/canton-smoke.mts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
