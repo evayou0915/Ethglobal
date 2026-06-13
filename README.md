@@ -11,7 +11,25 @@
 [![Hono](https://img.shields.io/badge/Hono-Backend-FF6F00?style=for-the-badge)](https://hono.dev/)
 [![Prisma](https://img.shields.io/badge/Prisma-Postgres-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io/)
 [![Walrus](https://img.shields.io/badge/Walrus-Blob_Storage-7CFBFF?style=for-the-badge)](https://www.walrus.xyz/)
+[![Claude](https://img.shields.io/badge/AI-Claude-D97757?style=for-the-badge)](https://www.anthropic.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-license)
+
+---
+
+## 🔗 Live demo
+
+| | |
+| --- | --- |
+| **App** | **https://aurasci-ethglobal.vercel.app** |
+| **Escrow contract** (Base Sepolia) | [`0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4`](https://sepolia.basescan.org/address/0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4) |
+| **USDC** (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| **Chain** | Base Sepolia (84532) |
+| **AI verifier** | Anthropic Claude (`claude-haiku-4-5`) — real proof grading in `llm` mode |
+
+> Sign in with a browser wallet (MetaMask / Rabby) on Base Sepolia; grab test
+> ETH + USDC from the in-app faucet links. The backend API base URL is a
+> rotating dev tunnel during the hackathon, so if the app can't reach the API,
+> the demo host needs to be running — see [Deployment](#-deployment).
 
 ---
 
@@ -80,7 +98,7 @@ verifier's public key, and the admin's address.
 | Canton rail | [`canton/`](canton/) | Daml templates for ledger-private patronage (see [canton/README.md](canton/README.md)) |
 | Backend API | [`backend/src/server.ts`](backend/src/server.ts) | Hono on Node 20 |
 | Chain indexer | [`backend/src/indexer.ts`](backend/src/indexer.ts) | viem `watchContractEvent` |
-| AI worker | [`backend/src/ai-worker.ts`](backend/src/ai-worker.ts) | OpenAI-compatible LLM + EIP-712 signer |
+| AI worker | [`backend/src/ai-worker.ts`](backend/src/ai-worker.ts) | Anthropic Claude grader + EIP-712 signer |
 | Proof storage | [`backend/src/lib/walrus.ts`](backend/src/lib/walrus.ts) | Walrus HTTP publisher/aggregator (blobs certified on Sui) |
 | Smart contract | [`contracts/src/AuraSciEscrow.sol`](contracts/src/AuraSciEscrow.sol) | Solidity 0.8.24 + OZ |
 | DB schema | [`backend/prisma/schema.prisma`](backend/prisma/schema.prisma) | Postgres via Prisma |
@@ -145,12 +163,20 @@ Two distinct AI jobs, both run by the same worker process
 - 5-agent quorum, each scoring 0–100 from a different angle (feasibility, milestone clarity, scientific rigor, novelty, risk).
 - **Pass requires BOTH** ≥3/5 agents approving AND mean score ≥ 70. Otherwise → `status = "rejected"` and the intent is hidden from the market.
 
+Both jobs call **Anthropic Claude** via the official `@anthropic-ai/sdk`
+([backend/src/lib/ai.ts](backend/src/lib/ai.ts) `callClaude`). Model is set by
+`ANTHROPIC_MODEL` (default `claude-haiku-4-5` — cheap enough to grade every
+claim; bump to `claude-sonnet-4-6` / `claude-opus-4-8` for more rigor).
+
 **Verifier** (per-milestone proof)
-- In `llm` mode (set `AI_VERIFIER_MODE=llm`) the worker **fetches the proof
-  artifact back from Walrus**, extracts readable content (PDF via unpdf,
-  text formats directly), and grades it against the milestone's stated
-  deliverable. A proof that can't be retrieved never produces a release
-  signature. `approve` mode remains as a zero-LLM-key demo escape hatch.
+- In `llm` mode (set `AI_VERIFIER_MODE=llm` + `ANTHROPIC_API_KEY`) the worker
+  **fetches the proof artifact back from Walrus**, extracts readable content
+  (PDF via unpdf, text formats directly), and grades it against the
+  milestone's stated deliverable. A proof that can't be retrieved never
+  produces a release signature. `approve` mode remains as a zero-key demo
+  escape hatch.
+- Verified live: a real milestone proof scores **82/100** and a garbage
+  proof **5/100** — `npm run --prefix backend exec tsx scripts/verifier-claude-smoke.mts`.
 - On pass, the worker signs an EIP-712 release payload and caches it on the milestone row. The scientist's "Claim" button broadcasts that cached signature — failed broadcasts (cancelled popups, gas issues) become a clean "Resume claim" without re-grading.
 
 The verifier key never touches the frontend. The signed payload + nonce live
@@ -184,7 +210,7 @@ from any address other than `/me.wallet`.
 - Node 20+
 - Postgres 14+ (local or remote)
 - Base Sepolia RPC URL (Alchemy, Infura, or public endpoint)
-- An OpenAI-compatible API key (only needed if you want real AI scoring; the default verifier mode is `"approve"`)
+- An Anthropic API key (only needed for real AI scoring in `llm` mode; the default verifier mode is `"approve"`)
 
 ### 1. Clone + install
 
@@ -200,7 +226,7 @@ cd contracts && npm install && cd ..
 
 ```bash
 cp .env.example .env.local          # frontend (public NEXT_PUBLIC_* only)
-cp backend/.env.example backend/.env # backend (DB url, signer key, JWT secret, OpenAI key)
+cp backend/.env.example backend/.env # backend (DB url, signer key, JWT secret, Anthropic key)
 ```
 
 Critical vars:
@@ -212,7 +238,7 @@ Critical vars:
 - `WALRUS_PUBLISHER_URL` / `WALRUS_AGGREGATOR_URL` — default to the public
   Walrus testnet endpoints; no key needed
 - `AI_VERIFIER_MODE` — `llm` for real Walrus-fetch + LLM grading (needs
-  `OPENAI_API_KEY`), `approve` to demo the flow without one
+  `ANTHROPIC_API_KEY`), `approve` to demo the flow without one
 
 ### 3. Deploy / use the escrow contract
 
