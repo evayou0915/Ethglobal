@@ -8,7 +8,7 @@ import { useAuth } from "@/client/auth";
 import { useAdminRefundAll, useAdminWithdraw, useAuraBoost, useAuraHeat, useAuraLeaderboard, useAuraSeason, useFund, useIntent, useRefund, useRefundEligibility, useSession } from "@/client/hooks";
 import { useToast } from "@/components/Toast";
 import { useSignInModal } from "@/client/sign-in-store";
-import { walrusBlobUrl } from "@/client/walrus";
+import { isWalrusBlobId, walrusBlobUrl } from "@/client/walrus";
 import type { IntentDto, MilestoneDto } from "@/types/api";
 
 // ─── Display helpers ────────────────────────────────────────────────────
@@ -351,7 +351,7 @@ export default function IntentDetailPage() {
                           )}
                           <div className="meta">
                             <span><b>{m.proofUploadedAt
-                              ? (m.proofCid
+                              ? (m.proofCid && isWalrusBlobId(m.proofCid)
                                   ? <a href={walrusBlobUrl(m.proofCid)} target="_blank" rel="noreferrer"
                                        style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 3 }}
                                        title={`Walrus blob ${m.proofCid}`}>Proof on Walrus ↗</a>
