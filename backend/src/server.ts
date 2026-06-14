@@ -62,7 +62,9 @@ app.onError((err, c) => {
 
 app.notFound((c) => fail(c, 404, "not_found", `no route for ${c.req.method} ${c.req.path}`));
 
-serve({ fetch: app.fetch, port: ENV.PORT }, (info) => {
+// Bind 0.0.0.0 so platform proxies (Railway/Render/etc.) can reach the
+// container — the default can be loopback-only, which fails health checks.
+serve({ fetch: app.fetch, port: ENV.PORT, hostname: "0.0.0.0" }, (info) => {
   console.log(`▶ aurasci-backend listening on http://localhost:${info.port}`);
   console.log(`  chain     = ${ENV.CHAIN_ID === 8453 ? "base" : "base-sepolia"} (${ENV.CHAIN_ID})`);
   console.log(`  escrow    = ${ENV.ESCROW_ADDRESS}`);
