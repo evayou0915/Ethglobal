@@ -21,15 +21,17 @@
 | | |
 | --- | --- |
 | **App** | **https://aurasci-ethglobal.vercel.app** |
+| **Backend API** | **https://aurasci-api-production.up.railway.app** (Railway · always-on) |
 | **Escrow contract** (Base Sepolia) | [`0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4`](https://sepolia.basescan.org/address/0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4) |
 | **USDC** (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | **Chain** | Base Sepolia (84532) |
 | **AI verifier** | Anthropic Claude (`claude-haiku-4-5`) — real proof grading in `llm` mode |
 
 > Sign in with a browser wallet (MetaMask / Rabby) on Base Sepolia; grab test
-> ETH + USDC from the in-app faucet links. The backend API base URL is a
-> rotating dev tunnel during the hackathon, so if the app can't reach the API,
-> the demo host needs to be running — see [Deployment](#-deployment).
+> ETH + USDC from the in-app faucet links. Frontend on Vercel, backend
+> (api + chain indexer + AI worker) + Postgres on Railway — both always-on,
+> no local host required. The Canton private rail is local-only (run
+> `daml start` in [canton/](canton/)); the Base + Walrus + Claude flow is live.
 
 ---
 
