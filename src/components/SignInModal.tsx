@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLoginWithEmail, useLoginWithOAuth } from "@privy-io/react-auth";
 import { useSiweLogin } from "@/client/hooks";
+
+const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
 export function SignInModal({
   open,
@@ -72,8 +75,19 @@ export function SignInModal({
             {login.isPending ? "Check your wallet…" : "Connect wallet & sign in"}
           </button>
 
+          {PRIVY_APP_ID && (
+            <>
+              <div className="as-divider">or with email / social</div>
+              <PrivyEmailSocial onClose={onClose} setErr={setErr} />
+            </>
+          )}
+
           {err && <div className="as-err">{err}</div>}
-          <div className="as-foot">Sign-In with Ethereum · works with MetaMask, Rabby &amp; other browser wallets.</div>
+          <div className="as-foot">
+            {PRIVY_APP_ID
+              ? "Wallet via Sign-In with Ethereum · email & social via Privy."
+              : "Sign-In with Ethereum · works with MetaMask, Rabby & other browser wallets."}
+          </div>
         </div>
       </div>
 
@@ -99,7 +113,95 @@ export function SignInModal({
         .as-close:hover { color: #c2410c; background: rgba(254,215,170,0.30); }
         .as-foot { margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(58,36,24,0.45); letter-spacing: .06em; text-align: center; }
         .as-err { margin-top: 14px; padding: 10px 12px; border-radius: 6px; background: rgba(194,65,12,0.08); border: 1px solid rgba(194,65,12,0.30); color: #7c2d12; font-size: 12px; font-family: 'JetBrains Mono', monospace; line-height: 1.5; }
+        .as-divider { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: rgba(58,36,24,0.45); text-align: center; margin: 16px 0 12px; letter-spacing: .14em; text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+        .as-divider::before, .as-divider::after { content: ''; flex: 1; height: 1px; background: rgba(58,36,24,0.12); }
+        .as-oauth { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .as-oauth-btn { padding: 11px 12px; border-radius: 6px; background: #fdfcf8; border: 1px solid rgba(58,36,24,0.20); color: #2a1a10; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .as-oauth-btn:hover:not(:disabled) { border-color: #c2410c; background: rgba(254,215,170,0.30); color: #c2410c; }
+        .as-oauth-btn:disabled { opacity: .5; cursor: not-allowed; }
+        .as-field input { width: 100%; padding: 11px 14px; border-radius: 6px; border: 1px solid rgba(58,36,24,0.18); background: #faf3e3; font-family: 'Inter', sans-serif; font-size: 14px; color: #2a1a10; outline: none; box-sizing: border-box; margin-bottom: 8px; }
+        .as-field input:focus { border-color: #c2410c; background: #fffaee; }
+        .as-btn-primary { width: 100%; padding: 11px 16px; background: #c2410c; color: #faf3e3; border: none; border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s; }
+        .as-btn-primary:hover:not(:disabled) { background: #9a3412; }
+        .as-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .as-link-btn { margin-top: 8px; width: 100%; background: transparent; border: none; color: rgba(58,36,24,0.55); font-size: 12px; cursor: pointer; font-family: 'Inter', sans-serif; }
       `}</style>
+    </>
+  );
+}
+
+/** Email + Google/X login via Privy. Only mounted when NEXT_PUBLIC_PRIVY_APP_ID
+ *  is set, so its Privy hooks always run inside <PrivyProvider/>. On success
+ *  PrivyTokenBridge mirrors the token + flips auth state; we just close. */
+function PrivyEmailSocial({ onClose, setErr }: { onClose: () => void; setErr: (s: string | null) => void }) {
+  const [view, setView] = useState<"options" | "otp">("options");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const { initOAuth } = useLoginWithOAuth({
+    onComplete: () => onClose(),
+    onError: (e) => setErr(String(e)),
+  });
+  const { sendCode, loginWithCode } = useLoginWithEmail({
+    onComplete: () => onClose(),
+    onError: (e) => setErr(String(e)),
+  });
+
+  async function oauth(provider: "google" | "twitter") {
+    setErr(null); setBusy(true);
+    try { await initOAuth({ provider }); }
+    catch (e: any) { setErr(e?.message ?? String(e)); }
+    finally { setBusy(false); }
+  }
+  async function send(e: React.FormEvent) {
+    e.preventDefault(); setErr(null);
+    if (!email.trim()) return;
+    setBusy(true);
+    try { await sendCode({ email: email.trim() }); setView("otp"); }
+    catch (e: any) { setErr(e?.message ?? String(e)); }
+    finally { setBusy(false); }
+  }
+  async function verify(e: React.FormEvent) {
+    e.preventDefault(); setErr(null);
+    if (code.trim().length < 4) return;
+    setBusy(true);
+    try { await loginWithCode({ code: code.trim() }); }
+    catch (e: any) { setErr(e?.message ?? String(e)); }
+    finally { setBusy(false); }
+  }
+
+  if (view === "otp") {
+    return (
+      <form className="as-field" onSubmit={verify}>
+        <input
+          type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code"
+          value={code} maxLength={8} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} disabled={busy}
+          style={{ letterSpacing: "0.3em", textAlign: "center" }}
+        />
+        <button type="submit" className="as-btn-primary" disabled={busy || code.length < 4}>
+          {busy ? "Verifying…" : "Verify & sign in"}
+        </button>
+        <button type="button" className="as-link-btn" onClick={() => setView("options")}>← use a different method</button>
+      </form>
+    );
+  }
+
+  return (
+    <>
+      <div className="as-oauth">
+        <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("google")}>Google</button>
+        <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("twitter")}>X</button>
+      </div>
+      <form className="as-field" onSubmit={send}>
+        <input
+          type="email" name="email" placeholder="you@example.com" autoComplete="email" required
+          value={email} onChange={(e) => setEmail(e.target.value)} disabled={busy}
+        />
+        <button type="submit" className="as-btn-primary" disabled={busy || !email.trim()}>
+          {busy ? "Sending…" : "Continue with email"}
+        </button>
+      </form>
     </>
   );
 }
