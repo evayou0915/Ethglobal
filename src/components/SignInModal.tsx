@@ -187,12 +187,23 @@ function PrivyEmailSocial({ onClose, setErr }: { onClose: () => void; setErr: (s
     );
   }
 
+  // Only show OAuth buttons for providers actually enabled in the Privy
+  // dashboard (set NEXT_PUBLIC_PRIVY_OAUTH="google,twitter") — otherwise a
+  // click would hit a provider that isn't configured and error.
+  const oauthEnabled = (process.env.NEXT_PUBLIC_PRIVY_OAUTH ?? "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
   return (
     <>
-      <div className="as-oauth">
-        <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("google")}>Google</button>
-        <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("twitter")}>X</button>
-      </div>
+      {oauthEnabled.length > 0 && (
+        <div className="as-oauth">
+          {oauthEnabled.includes("google") && (
+            <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("google")}>Google</button>
+          )}
+          {oauthEnabled.includes("twitter") && (
+            <button className="as-oauth-btn" disabled={busy} onClick={() => oauth("twitter")}>X</button>
+          )}
+        </div>
+      )}
       <form className="as-field" onSubmit={send}>
         <input
           type="email" name="email" placeholder="you@example.com" autoComplete="email" required
