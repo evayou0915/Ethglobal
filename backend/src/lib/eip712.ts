@@ -1,5 +1,33 @@
-import { keccak256, toBytes, getAddress } from "viem";
+import { keccak256, toBytes, getAddress, type LocalAccount } from "viem";
+import { createViemAccount } from "@privy-io/server-auth/viem";
 import { chain, ESCROW_ADDRESS, getSignerWalletClient } from "./chain.js";
+import { ENV } from "./env.js";
+import { privy } from "./privy.js";
+
+/** The account that authorizes milestone releases. Either the local
+ *  SIGNER_PRIVATE_KEY account, or — when RELEASE_SIGNER=privy — a Privy
+ *  server wallet exposed as a viem LocalAccount (non-custodial, governed
+ *  by its policy). Both implement `signTypedData`, so the EIP-712 release
+ *  signature the escrow verifies is produced identically. */
+let _releaseAccount: LocalAccount | null = null;
+async function getReleaseAccount(): Promise<LocalAccount> {
+  if (_releaseAccount) return _releaseAccount;
+  if (ENV.RELEASE_SIGNER === "privy") {
+    if (!ENV.PRIVY_WALLET_ID || !ENV.PRIVY_WALLET_ADDRESS) {
+      throw new Error("RELEASE_SIGNER=privy but PRIVY_WALLET_ID / PRIVY_WALLET_ADDRESS unset");
+    }
+    _releaseAccount = await createViemAccount({
+      walletId: ENV.PRIVY_WALLET_ID,
+      address: ENV.PRIVY_WALLET_ADDRESS as `0x${string}`,
+      // The /viem subpath and the root export ship separate PrivyClient
+      // declarations (ESM vs CJS dts); they're the same runtime class.
+      privy: privy() as any,
+    });
+  } else {
+    _releaseAccount = getSignerWalletClient().account as LocalAccount;
+  }
+  return _releaseAccount;
+}
 
 /** EIP-712 domain for AuraSciEscrow. Must match the contract's `EIP712("AuraSciEscrow", "1")`. */
 export const ESCROW_DOMAIN = {
@@ -52,9 +80,8 @@ export async function signRelease(args: {
   amount: bigint;
   nonce: `0x${string}`;
 }) {
-  const { client, account } = getSignerWalletClient();
-  const signature = await client.signTypedData({
-    account,
+  const account = await getReleaseAccount();
+  const signature = await account.signTypedData({
     domain: ESCROW_DOMAIN,
     types: RELEASE_TYPES,
     primaryType: "Release",
@@ -74,9 +101,8 @@ export async function signRefund(args: {
   amount: bigint;
   nonce: `0x${string}`;
 }) {
-  const { client, account } = getSignerWalletClient();
-  const signature = await client.signTypedData({
-    account,
+  const account = await getReleaseAccount();
+  const signature = await account.signTypedData({
     domain: ESCROW_DOMAIN,
     types: REFUND_TYPES,
     primaryType: "Refund",
