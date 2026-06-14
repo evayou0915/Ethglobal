@@ -62,6 +62,7 @@ enum ActivityKind {
 
 model User {
   wallet      String   @id @db.VarChar(42)        // lowercased 0x address — proven via SIWE signature at login
+  privyId     String?  @unique @db.VarChar(64)    // "did:privy:..." when the user authed via Privy
   role        UserRole
   email       String?  @db.VarChar(200)           // optional contact email (not collected by the login flow)
   displayName String?  @db.VarChar(80)            // optional human-readable handle

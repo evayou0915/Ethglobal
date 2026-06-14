@@ -8,7 +8,8 @@ import { keccak256, parseUnits, toBytes } from "viem";
 import { createSiweMessage } from "viem/siwe";
 import type { Config, Connector } from "@wagmi/core";
 import { api, auth } from "./api";
-import { useAuth } from "./auth";
+import { useAuth, useAuthStore } from "./auth";
+import { privyToken } from "./privy-token";
 import { ACTIVE_CHAIN, ESCROW_ADDRESS, USDC_ADDRESS, txUrl } from "@/wagmi/config";
 import { AURASCI_ESCROW_ABI, ERC20_ABI } from "@/wagmi/abi";
 import type { IntentDto, IntentListResponse } from "@/types/api";
@@ -131,13 +132,18 @@ export function useSiweLogin() {
  *  (currently no-op) logout hook. */
 export function useLogout() {
   const { disconnectAsync } = useDisconnect();
+  const setPrivyAuthed = useAuthStore((s) => s.setPrivyAuthed);
   const qc = useQueryClient();
   return useCallback(async () => {
     try { await api.logout(); } catch { /* token already cleared in finally */ }
     auth.clear();
+    // End the Privy session too (no-op when Privy disabled), so the user
+    // doesn't get silently re-authed from a persisted Privy cookie.
+    try { await privyToken.logout(); } catch { /* ignore */ }
+    setPrivyAuthed(false);
     try { await disconnectAsync(); } catch { /* ignore */ }
     qc.removeQueries({ queryKey: ["me"] });
-  }, [disconnectAsync, qc]);
+  }, [disconnectAsync, setPrivyAuthed, qc]);
 }
 
 // ─── Reads ──────────────────────────────────────────────────────────────

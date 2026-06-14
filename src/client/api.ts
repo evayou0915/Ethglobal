@@ -20,6 +20,7 @@ import type {
   AuraYieldDto,
 } from "@/types/api";
 import { authToken } from "./auth";
+import { privyToken } from "./privy-token";
 
 /** Backend base URL — points at the self-hosted Hono server (e.g. https://api.aurasci.xyz).
  *  Empty string falls back to relative URLs which is useful when running the
@@ -42,7 +43,9 @@ function url(path: string): string {
 }
 
 async function authHeader(): Promise<Record<string, string>> {
-  const t = authToken.current();
+  // Prefer the self-issued SIWE JWT (wallet path); fall back to the Privy
+  // access token (email/social path) cached by PrivyTokenBridge.
+  const t = authToken.current() ?? privyToken.current();
   return t ? { Authorization: "Bearer " + t } : {};
 }
 

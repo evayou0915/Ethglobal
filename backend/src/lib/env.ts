@@ -24,6 +24,17 @@ export const ENV = {
   JWT_SECRET:      required("JWT_SECRET"),
   JWT_TTL_SECONDS: Number(optional("JWT_TTL_SECONDS", "604800")), // 7d
 
+  // Privy (optional dual-token path). Empty = Privy disabled, SIWE-only auth.
+  // APP_ID is also exposed to the browser as NEXT_PUBLIC_PRIVY_APP_ID.
+  PRIVY_APP_ID:     process.env.PRIVY_APP_ID ?? "",
+  PRIVY_APP_SECRET: process.env.PRIVY_APP_SECRET ?? "",
+
+  // Release signer: "local" = sign EIP-712 releases with SIGNER_PRIVATE_KEY;
+  // "privy" = sign with a Privy server wallet (policy-governed, no raw key).
+  RELEASE_SIGNER:       optional("RELEASE_SIGNER", "local"),
+  PRIVY_WALLET_ID:      process.env.PRIVY_WALLET_ID ?? "",
+  PRIVY_WALLET_ADDRESS: (process.env.PRIVY_WALLET_ADDRESS ?? "") as `0x${string}` | "",
+
   CHAIN_ID:               Number(optional("CHAIN_ID", "84532")),
   BASE_RPC_URL:           optional("BASE_RPC_URL", "https://mainnet.base.org"),
   BASE_SEPOLIA_RPC_URL:   optional("BASE_SEPOLIA_RPC_URL", "https://sepolia.base.org"),

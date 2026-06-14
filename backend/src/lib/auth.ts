@@ -10,6 +10,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ENV } from "./env.js";
 import { prisma } from "./db.js";
+import { privyEnabled, verifyPrivyToken, privy, pickPinnedWallet, extractIdentity } from "./privy.js";
 
 const SECRET = new TextEncoder().encode(ENV.JWT_SECRET);
 const ISSUER = "aurasci";
@@ -43,46 +44,90 @@ declare module "hono" {
   interface ContextVariableMap {
     wallet: string;                                 // populated after requireAuth
     role: Claims["role"] | undefined;
+    privyId: string | undefined;                    // set only for Privy-authed callers
   }
 }
 
-// ─── JWT-backed middleware ──────────────────────────────────────────────
+// ─── Dual-token middleware (SIWE self-JWT + Privy) ──────────────────────
 
-/** Verify a self-issued JWT, ensure a local User row exists, and stash the
- *  wallet / role on the Hono context for downstream handlers. */
-async function authenticateAndUpsert(token: string, c: Context) {
-  let claims: Claims;
-  try {
-    claims = await verifyToken(token);
-  } catch (e) {
-    throw new HTTPException(401, { message: "invalid token: " + (e as Error).message });
-  }
-  const wallet = claims.sub.toLowerCase();
-  if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
-    throw new HTTPException(401, { message: "token subject is not a wallet address" });
-  }
-
-  // The User row is created at SIWE login time, but tolerate tokens that
-  // outlive a DB reset by lazily re-creating the row here.
+/** Touch the User row for `wallet` (create on first sight, refresh
+ *  lastLoginAt at most once a minute) and stash wallet/role on context. */
+async function hydrateUser(wallet: string, c: Context, opts: { privyId?: string; email?: string | null; displayName?: string | null } = {}) {
   let user = await prisma.user.findUnique({ where: { wallet } });
   if (!user) {
     user = await prisma.user.create({
-      data: { wallet, role: "patron", lastLoginAt: new Date() },
+      data: {
+        wallet, role: "patron", lastLoginAt: new Date(),
+        privyId: opts.privyId ?? null,
+        email: opts.email ?? null,
+        displayName: opts.displayName ?? null,
+      },
     });
   } else {
-    // Lightly refresh lastLoginAt — not on every request, only when the
-    // last write was more than a minute ago, so the DB write rate stays sane.
     const stale = !user.lastLoginAt || Date.now() - user.lastLoginAt.getTime() > 60_000;
-    if (stale) {
-      user = await prisma.user.update({ where: { wallet }, data: { lastLoginAt: new Date() } });
+    // Backfill privyId the first time a wallet-pinned user logs in via Privy.
+    const needPrivyId = opts.privyId && user.privyId !== opts.privyId;
+    if (stale || needPrivyId) {
+      user = await prisma.user.update({
+        where: { wallet },
+        data: { lastLoginAt: new Date(), ...(needPrivyId ? { privyId: opts.privyId } : {}) },
+      });
+    }
+  }
+  // DB is the single source of truth for role — never the token.
+  c.set("wallet", user.wallet);
+  c.set("role", user.role);
+  if (opts.privyId) c.set("privyId", opts.privyId);
+}
+
+/** Verify the bearer token and hydrate context. Tries the self-issued SIWE
+ *  JWT first (the primary, always-on path); if that fails and Privy is
+ *  configured, falls back to verifying a Privy access token via JWKS. */
+async function authenticateAndUpsert(token: string, c: Context) {
+  // 1. Self-issued SIWE JWT (HS256) — sub is the wallet address.
+  try {
+    const claims = await verifyToken(token);
+    const wallet = claims.sub.toLowerCase();
+    if (!/^0x[0-9a-f]{40}$/.test(wallet)) {
+      throw new HTTPException(401, { message: "token subject is not a wallet address" });
+    }
+    await hydrateUser(wallet, c);
+    return;
+  } catch (siweErr) {
+    if (!privyEnabled()) {
+      throw new HTTPException(401, { message: "invalid token: " + (siweErr as Error).message });
     }
   }
 
-  // DB is the single source of truth for the user's role — never the token,
-  // so role changes (e.g. onboarding promotes patron → scientist) apply to
-  // already-issued sessions immediately.
-  c.set("wallet", user.wallet);
-  c.set("role", user.role);
+  // 2. Privy access token — verify against Privy's JWKS, pin the wallet.
+  let privyId: string;
+  try {
+    const claims = await verifyPrivyToken(token);
+    privyId = claims.userId;
+  } catch (e) {
+    throw new HTTPException(401, { message: "invalid token (neither SIWE nor Privy): " + (e as Error).message });
+  }
+
+  // Match an existing user by privyId first (fast path on repeat requests).
+  const existing = await prisma.user.findFirst({ where: { privyId } });
+  if (existing) {
+    await hydrateUser(existing.wallet, c, { privyId });
+    return;
+  }
+
+  // First sight of this Privy account — fetch the profile to pin a wallet.
+  let privyUser: any = null;
+  try { privyUser = await privy().getUserById(privyId); }
+  catch (e) {
+    throw new HTTPException(503, { message: "could not fetch Privy profile — retry shortly: " + (e as Error).message });
+  }
+  const pinned = pickPinnedWallet(privyUser);
+  if (!pinned) {
+    // Embedded wallet not provisioned yet — the frontend should retry.
+    throw new HTTPException(503, { message: "embedded wallet pending provisioning by Privy — retry shortly" });
+  }
+  const ident = extractIdentity(privyUser);
+  await hydrateUser(pinned, c, { privyId, email: ident.email, displayName: ident.displayName });
 }
 
 export const requireAuth: MiddlewareHandler = async (c, next) => {

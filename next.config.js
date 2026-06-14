@@ -25,6 +25,10 @@ const nextConfig = {
         // can't statically resolve. Alias to empty — the dynamic import path
         // never fires at runtime because no connector references metaMask().
         "@metamask/sdk": "./empty.js",
+        // @privy-io/react-auth ships optional adapters (Farcaster mini-app,
+        // Stripe on-ramp) we don't use; stub so the bundler doesn't choke.
+        "@farcaster/mini-app-solana": "./empty.js",
+        "@stripe/crypto": "./empty.js",
       },
     },
   },
@@ -37,6 +41,9 @@ const nextConfig = {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       "@react-native-async-storage/async-storage": false,
+      // Privy optional adapters we don't use — let the build ignore them.
+      "@farcaster/mini-app-solana": false,
+      "@stripe/crypto": false,
     };
     return config;
   },

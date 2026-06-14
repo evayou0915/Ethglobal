@@ -20,14 +20,17 @@ const STORAGE_KEY = "aurasci.jwt";
 
 type AuthState = {
   ready: boolean;
-  token: string | null;
+  token: string | null;            // self-issued SIWE JWT
+  privyAuthed: boolean;            // set by PrivyTokenBridge when a Privy session is active
   hydrate: () => void;
   setToken: (token: string | null) => void;
+  setPrivyAuthed: (v: boolean) => void;
 };
 
 export const useAuthStore = create<AuthState>((set) => ({
   ready: false,
   token: null,
+  privyAuthed: false,
   hydrate: () => {
     let token: string | null = null;
     try { token = localStorage.getItem(STORAGE_KEY); } catch { /* SSR / private mode */ }
@@ -40,6 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch { /* ignore */ }
     set({ token });
   },
+  setPrivyAuthed: (v) => set({ privyAuthed: v }),
 }));
 
 /** Non-React accessor for the current token (used by api.ts). Falls back
@@ -60,14 +64,18 @@ export const authToken = {
 };
 
 /** Auth state for components: `ready` (localStorage read), `authenticated`
- *  (a session token is present). The pinned wallet / role come from the
- *  /me query — see useSession() in hooks.ts. */
+ *  (a SIWE session token is present, OR a Privy session is active). The
+ *  pinned wallet / role come from the /me query — see useSession() in
+ *  hooks.ts. Reads `privyAuthed` from the store (set by PrivyTokenBridge)
+ *  rather than calling usePrivy() directly, so this hook is safe to use
+ *  outside a PrivyProvider (Privy-disabled mode). */
 export function useAuth(): { ready: boolean; authenticated: boolean } {
   const ready = useAuthStore((s) => s.ready);
   const token = useAuthStore((s) => s.token);
+  const privyAuthed = useAuthStore((s) => s.privyAuthed);
   const hydrate = useAuthStore((s) => s.hydrate);
   useEffect(() => {
     if (!useAuthStore.getState().ready) hydrate();
   }, [hydrate]);
-  return { ready, authenticated: Boolean(token) };
+  return { ready, authenticated: Boolean(token) || privyAuthed };
 }
