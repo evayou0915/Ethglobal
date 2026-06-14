@@ -12,6 +12,7 @@
 [![Prisma](https://img.shields.io/badge/Prisma-Postgres-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io/)
 [![Walrus](https://img.shields.io/badge/Walrus-Blob_Storage-7CFBFF?style=for-the-badge)](https://www.walrus.xyz/)
 [![Claude](https://img.shields.io/badge/AI-Claude-D97757?style=for-the-badge)](https://www.anthropic.com/)
+[![Privy](https://img.shields.io/badge/Wallets-Privy-6A6FF5?style=for-the-badge)](https://www.privy.io/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](#-license)
 
 ---
@@ -22,10 +23,11 @@
 | --- | --- |
 | **App** | **https://aurasci-ethglobal.vercel.app** |
 | **Backend API** | **https://aurasci-api-production.up.railway.app** (Railway · always-on) |
-| **Escrow contract** (Base Sepolia) | [`0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4`](https://sepolia.basescan.org/address/0x78C62DAd99F1174DAABdD730a6Dd512CDbB44dB4) |
+| **Escrow contract** (Base Sepolia) | [`0x69F15fafEF08a6Fb7fBF28e0F92467a5532F1812`](https://sepolia.basescan.org/address/0x69F15fafEF08a6Fb7fBF28e0F92467a5532F1812) |
 | **USDC** (Base Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
 | **Chain** | Base Sepolia (84532) |
 | **AI verifier** | Anthropic Claude (`claude-haiku-4-5`) — real proof grading in `llm` mode |
+| **Release signer** | Privy **server wallet** `0xA7084d5e27043F4126C161c8a31eF6D0efDca5Cd` — signs EIP-712 releases, policy-restricted |
 
 > Sign in with a browser wallet (MetaMask / Rabby) on Base Sepolia; grab test
 > ETH + USDC from the in-app faucet links. Frontend on Vercel, backend
@@ -120,7 +122,9 @@ EIP-712 signature from the backend's verifier key:
 | `adminWithdraw(intentId, to, amount, reason)` | Admin only | Escape hatch / governance — bypasses milestone gating, capped at 100k USDC per tx. |
 
 Admin power is **rotatable** via a two-step `transferAdmin` → `acceptAdmin`
-flow. The verifier key is rotatable via `setSigner` (admin-only).
+flow. The `signer` is **immutable** (set once at deploy) — rotating the
+verifier key means deploying a fresh escrow pointed at the new signer
+address (which is how the Privy server wallet became the signer).
 
 Why signatures and not direct admin calls? So the AI worker can sign release
 authorizations without ever holding withdraw power. If the verifier key
@@ -183,6 +187,35 @@ claim; bump to `claude-sonnet-4-6` / `claude-opus-4-8` for more rigor).
 
 The verifier key never touches the frontend. The signed payload + nonce live
 in `Milestone.releaseSignature / releaseNonce`.
+
+---
+
+## 🔐 Privy server wallet (the AI signer)
+
+The AI verifier is an **agent**, and its release-signing key is a
+non-custodial **Privy server wallet** — not a raw private key in an env
+var. After the verifier grades a proof, the backend signs the EIP-712
+`Release` authorization with the server wallet via
+[`@privy-io/server-auth`](https://www.privy.io/) (`createViemAccount` →
+viem `LocalAccount`); the escrow's immutable `signer` is that wallet's
+address, so its ECDSA check passes.
+
+A **policy engine rule** governs the wallet: it may only call
+`eth_signTypedData_v4` on Base Sepolia (`chain_id == 84532`). It can
+never send a transaction, sign another chain's data, or export its key —
+so even a fully-compromised backend can't make the agent move funds, only
+sign valid milestone releases the escrow already enforces.
+
+- Switch signer via `RELEASE_SIGNER=local|privy`; wallet ids in
+  `PRIVY_WALLET_ID` / `PRIVY_WALLET_ADDRESS`.
+- Setup: [`backend/scripts/privy-setup-wallet.mts`](backend/scripts/privy-setup-wallet.mts)
+  creates the wallet + policy; `privy-sign-test.mts` proves a Privy-signed
+  release recovers to the wallet.
+- Optional: setting `NEXT_PUBLIC_PRIVY_APP_ID` (frontend) + `PRIVY_APP_ID`/
+  `PRIVY_APP_SECRET` (backend) also lights up Privy email / Google / X
+  login alongside the SIWE wallet flow (dual-token auth).
+
+> Built for the ETHGlobal Agents · Privy prize (server wallets + policy engine).
 
 ---
 
